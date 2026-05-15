@@ -15,7 +15,7 @@ Essa primeira versão demonstra:
 ## Estrutura do projeto
 
 ```txt
-gamehub-skeleton/
+electricity-ecommerce/
 ├── backend/
 │   ├── package.json
 │   ├── server.js
@@ -66,12 +66,12 @@ Antes de executar, instale:
 
 ### 1. Baixar o projeto
 
-Se estiver usando o `.zip`, extraia a pasta `gamehub-skeleton`.
+Se estiver usando o `.zip`, extraia a pasta `electricity-ecommerce`.
 
 Depois entre na pasta:
 
 ```bash
-cd gamehub-skeleton
+cd electricity-ecommerce
 ```
 
 ---
@@ -128,7 +128,7 @@ http://localhost:3333/api/health
 Abra outro terminal, volte para a raiz do projeto e entre no front-end:
 
 ```bash
-cd gamehub-skeleton/frontend
+cd electricity-ecommerce/frontend
 ```
 
 Instale as dependências:
