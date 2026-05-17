@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import { useCart } from "../context/CartContext.jsx";
 import React from "react";
 
 export default function GameDetails() {
@@ -8,6 +9,8 @@ export default function GameDetails() {
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [added, setAdded] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     api.getGame(id)
@@ -15,6 +18,12 @@ export default function GameDetails() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  function handleAddToCart() {
+    addToCart(game);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  }
 
   if (loading) return <p>Carregando detalhes...</p>;
   if (error) return <p className="error">{error}</p>;
@@ -33,7 +42,9 @@ export default function GameDetails() {
         <p><strong>Gêneros:</strong> {game.genres?.join(", ") || "Não informado"}</p>
         <p><strong>Plataformas:</strong> {game.platforms?.slice(0, 8).join(", ") || "Não informado"}</p>
         <div className="hero-actions">
-          <button className="button" onClick={() => alert("Protótipo: item adicionado ao carrinho!")}>Adicionar ao carrinho</button>
+          <button className={`button${added ? " button-added" : ""}`} onClick={handleAddToCart}>
+            {added ? "✓ Adicionado!" : "Adicionar ao carrinho"}
+          </button>
           <Link className="button secondary" to="/catalog">Voltar ao catálogo</Link>
         </div>
       </div>

@@ -9,10 +9,12 @@ import AdminRawgImport from "./pages/AdminRawgImport.jsx";
 import AdminGames from "./pages/AdminGames.jsx";
 import Cart from "./pages/Cart.jsx";
 import Library from "./pages/Library.jsx";
+import { CartProvider } from "./context/CartContext.jsx";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
+    <CartProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />}>
@@ -26,5 +28,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
+    </CartProvider>
   </React.StrictMode>
 );
