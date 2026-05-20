@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 
 export default function Cart() {
-  const { items, removeFromCart, changeQty, clearCart, total } = useCart();
+  const { items, removeFromCart, changeQty, clearCart, purchaseCart, total } = useCart();
   const [purchased, setPurchased] = useState(false);
 
   function handleCheckout() {
-    clearCart();
+    purchaseCart();
     setPurchased(true);
   }
 

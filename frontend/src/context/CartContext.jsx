@@ -4,6 +4,7 @@ const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
+  const [library, setLibrary] = useState([]);
 
   const addToCart = useCallback((game) => {
     setItems((prev) => {
@@ -31,11 +32,24 @@ export function CartProvider({ children }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  const purchaseCart = useCallback(() => {
+    setLibrary((prev) => {
+      const merged = [...prev];
+      items.forEach((item) => {
+        if (!merged.find((g) => g.id === item.id)) {
+          merged.push({ ...item });
+        }
+      });
+      return merged;
+    });
+    setItems([]);
+  }, [items]);
+
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const count = items.reduce((sum, item) => sum + item.qty, 0);
 
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, changeQty, clearCart, total, count }}>
+    <CartContext.Provider value={{ items, addToCart, removeFromCart, changeQty, clearCart, purchaseCart, library, total, count }}>
       {children}
     </CartContext.Provider>
   );
