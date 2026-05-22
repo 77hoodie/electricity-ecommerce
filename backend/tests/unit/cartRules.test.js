@@ -12,8 +12,8 @@ describe("regras do carrinho", () => {
 
   it("bloqueia jogo duplicado no carrinho", () => {
     expect(() => assertCanAddToCart({
-      game: { id: 1, isActive: true },
-      existingCartItem: { id: 10, gameId: 1 },
+      game: { id: 99, isActive: true },
+      existingCartItem: { id: 1, gameId: 1 },
       existingLibraryItem: null
     })).toThrow("Este jogo já está no carrinho");
   });

@@ -79,8 +79,8 @@ export default function AdminGenres() {
       <div className="page-title">
         <div>
           <p className="eyebrow">Administração</p>
-          <h1>CRUD de gêneros</h1>
-          <p className="muted">Segunda tela CRUD da entrega, com persistência no banco.</p>
+          <h1>Gêneros Admin</h1>
+          <p className="muted">Gêneros com persistência no banco.</p>
         </div>
       </div>
 

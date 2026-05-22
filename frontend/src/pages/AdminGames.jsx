@@ -104,7 +104,7 @@ export default function AdminGames() {
       <div className="page-title">
         <div>
           <p className="eyebrow">Administração</p>
-          <h1>CRUD de jogos</h1>
+          <h1>Jogos Admin</h1>
           <p className="muted">Operações persistidas no PostgreSQL via Prisma.</p>
         </div>
       </div>
