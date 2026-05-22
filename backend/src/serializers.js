@@ -3,6 +3,17 @@ function toDateString(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+export function serializeUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt?.toISOString?.() || user.createdAt
+  };
+}
+
 export function serializeGame(game) {
   return {
     id: game.id,
@@ -51,6 +62,7 @@ export function serializeCartItem(item) {
 export function serializeLibraryItem(item) {
   return {
     id: item.id,
+    userId: item.userId,
     purchasedAt: item.purchasedAt?.toISOString?.() || item.purchasedAt,
     ...serializeGame(item.game)
   };
@@ -59,6 +71,8 @@ export function serializeLibraryItem(item) {
 export function serializeOrder(order) {
   return {
     id: order.id,
+    userId: order.userId,
+    user: order.user ? serializeUser(order.user) : undefined,
     total: Number(order.total),
     status: order.status,
     createdAt: order.createdAt?.toISOString?.() || order.createdAt,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const emptyForm = {
   title: "",
@@ -11,6 +12,7 @@ const emptyForm = {
 };
 
 export default function AdminGames() {
+  const { isAdmin } = useAuth();
   const [games, setGames] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -26,6 +28,16 @@ export default function AdminGames() {
     loadGames().catch((err) => setError(err.message));
   }, []);
 
+
+
+  if (!isAdmin) {
+    return (
+      <section className="empty-state">
+        <h1>Acesso restrito</h1>
+        <p className="muted">Somente administradores podem acessar o CRUD de jogos.</p>
+      </section>
+    );
+  }
   function startEdit(game) {
     setEditingId(game.id);
     setForm({

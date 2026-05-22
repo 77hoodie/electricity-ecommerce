@@ -7,10 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 enum OrderStatus {
   PENDING
   PAID
   CANCELED
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders       Order[]
+  libraryItems LibraryItem[]
 }
 
 model Game {
@@ -51,18 +69,24 @@ model CartItem {
 
 model LibraryItem {
   id          Int      @id @default(autoincrement())
-  gameId      Int      @unique
+  userId      Int?
+  gameId      Int
   purchasedAt DateTime @default(now())
 
-  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
 }
 
 model Order {
   id        Int         @id @default(autoincrement())
+  userId    Int?
   total     Decimal     @db.Decimal(10, 2)
   status    OrderStatus @default(PAID)
   createdAt DateTime    @default(now())
 
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   items OrderItem[]
 }
 

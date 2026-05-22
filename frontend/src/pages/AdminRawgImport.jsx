@@ -1,14 +1,26 @@
 import { useState } from "react";
 import { api } from "../api";
 import React from "react";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AdminRawgImport() {
+  const { isAdmin } = useAuth();
   const [query, setQuery] = useState("elden ring");
   const [price, setPrice] = useState("99.90");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+
+  if (!isAdmin) {
+    return (
+      <section className="empty-state">
+        <h1>Acesso restrito</h1>
+        <p className="muted">Somente administradores podem importar jogos da RAWG.</p>
+      </section>
+    );
+  }
 
   async function handleSearch(event) {
     event.preventDefault();

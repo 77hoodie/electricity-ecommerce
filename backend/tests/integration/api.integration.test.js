@@ -6,10 +6,18 @@ const maybeDescribe = runIntegration ? describe : describe.skip;
 
 maybeDescribe("API Electricity - integração", () => {
   let app;
+  let admin;
 
   beforeAll(async () => {
     const module = await import("../../src/app.js");
     app = module.app;
+
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "admin@electricity.com", password: "admin123" })
+      .expect(200);
+
+    admin = login.body;
   });
 
   it("responde healthcheck", async () => {
@@ -22,11 +30,17 @@ maybeDescribe("API Electricity - integração", () => {
     expect(Array.isArray(response.body)).toBe(true);
   });
 
-  it("cria e remove um gênero", async () => {
+  it("realiza login com usuário admin", async () => {
+    expect(admin.email).toBe("admin@electricity.com");
+    expect(admin.role).toBe("ADMIN");
+  });
+
+  it("cria e remove um gênero como administrador", async () => {
     const name = `Teste ${Date.now()}`;
 
     const created = await request(app)
       .post("/api/genres")
+      .set("X-User-Id", String(admin.id))
       .send({ name })
       .expect(201);
 
@@ -34,6 +48,13 @@ maybeDescribe("API Electricity - integração", () => {
 
     await request(app)
       .delete(`/api/genres/${created.body.id}`)
+      .set("X-User-Id", String(admin.id))
       .expect(204);
+  });
+
+  it("bloqueia checkout sem login", async () => {
+    await request(app)
+      .post("/api/orders/checkout")
+      .expect(401);
   });
 });

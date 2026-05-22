@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AdminGenres() {
+  const { isAdmin } = useAuth();
   const [genres, setGenres] = useState([]);
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -17,6 +19,16 @@ export default function AdminGenres() {
     loadGenres().catch((err) => setError(err.message));
   }, []);
 
+
+
+  if (!isAdmin) {
+    return (
+      <section className="empty-state">
+        <h1>Acesso restrito</h1>
+        <p className="muted">Somente administradores podem acessar o CRUD de gêneros.</p>
+      </section>
+    );
+  }
   function startEdit(genre) {
     setEditingId(genre.id);
     setName(genre.name);

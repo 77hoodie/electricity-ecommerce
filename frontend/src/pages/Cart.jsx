@@ -1,13 +1,20 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Cart() {
   const { items, removeFromCart, clearCart, purchaseCart, total, loading, lastError } = useCart();
+  const { isLoggedIn } = useAuth();
   const [purchased, setPurchased] = useState(false);
   const [localError, setLocalError] = useState("");
 
   async function handleCheckout() {
+    if (!isLoggedIn) {
+      setLocalError("Faça login para finalizar a compra e adicionar jogos à biblioteca.");
+      return;
+    }
+
     const result = await purchaseCart();
     if (result.ok) {
       setPurchased(true);
@@ -34,7 +41,7 @@ export default function Cart() {
       <section className="empty-state" style={{ textAlign: "center" }}>
         <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎮</div>
         <h1>Compra realizada!</h1>
-        <p>O pedido foi salvo no banco e os jogos foram adicionados à biblioteca.</p>
+        <p>O pedido foi salvo no banco e os jogos foram adicionados à biblioteca da sua conta.</p>
         <div className="hero-actions" style={{ justifyContent: "center", marginTop: "1.5rem" }}>
           <Link className="button" to="/library">Ver biblioteca</Link>
           <Link className="button secondary" to="/catalog">Continuar comprando</Link>
@@ -47,7 +54,7 @@ export default function Cart() {
     return (
       <section className="empty-state">
         <h1>Carrinho</h1>
-        <p className="muted">Seu carrinho está vazio. Adicione jogos do catálogo para começar.</p>
+        <p className="muted">Seu carrinho está vazio. Visitantes também podem adicionar jogos, mas precisam entrar para finalizar a compra.</p>
         {(lastError || localError) && <p className="error">{lastError || localError}</p>}
         <div className="hero-actions" style={{ marginTop: "1.5rem" }}>
           <Link className="button" to="/catalog">Ver catálogo</Link>
@@ -62,10 +69,16 @@ export default function Cart() {
         <div>
           <p className="eyebrow">Loja</p>
           <h1>Carrinho</h1>
-          <p className="muted">Carrinho persistido no PostgreSQL. Como os jogos são digitais, cada jogo pode aparecer apenas uma vez.</p>
+          <p className="muted">Visitantes podem montar o carrinho. Para finalizar a compra e salvar na biblioteca, é necessário login.</p>
         </div>
         <button className="button secondary" onClick={handleClear}>Limpar carrinho</button>
       </div>
+
+      {!isLoggedIn && (
+        <div className="info-box">
+          Você está como visitante. <Link to="/login">Faça login</Link> ou <Link to="/register">crie uma conta</Link> para finalizar a compra.
+        </div>
+      )}
 
       {(lastError || localError) && <p className="error">{lastError || localError}</p>}
 
@@ -109,7 +122,7 @@ export default function Cart() {
           <span style={{ fontWeight: 800, fontSize: "1.4rem" }}>R$ {total.toFixed(2)}</span>
         </div>
         <button className="button" style={{ width: "100%", padding: "1rem" }} onClick={handleCheckout}>
-          Finalizar compra
+          {isLoggedIn ? "Finalizar compra" : "Entrar para finalizar"}
         </button>
       </div>
     </section>

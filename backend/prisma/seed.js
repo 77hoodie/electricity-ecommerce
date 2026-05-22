@@ -1,8 +1,35 @@
 import { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 const prisma = new PrismaClient();
 
+function hashPassword(password) {
+  return createHash("sha256").update(password).digest("hex");
+}
+
 async function main() {
+  await prisma.user.upsert({
+    where: { email: "admin@electricity.com" },
+    update: {},
+    create: {
+      name: "Administrador",
+      email: "admin@electricity.com",
+      passwordHash: hashPassword("admin123"),
+      role: "ADMIN"
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "user@electricity.com" },
+    update: {},
+    create: {
+      name: "Usuário Teste",
+      email: "user@electricity.com",
+      passwordHash: hashPassword("user123"),
+      role: "USER"
+    }
+  });
+
   await prisma.genre.createMany({
     data: [
       { name: "Ação" },
@@ -49,6 +76,8 @@ main()
   .then(async () => {
     await prisma.$disconnect();
     console.log("Seed concluído.");
+    console.log("Admin: admin@electricity.com / admin123");
+    console.log("Usuário: user@electricity.com / user123");
   })
   .catch(async (error) => {
     console.error(error);

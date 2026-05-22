@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
+import { useAuth } from "./AuthContext.jsx";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
+  const { user, isLoggedIn } = useAuth();
   const [items, setItems] = useState([]);
   const [library, setLibrary] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,10 +18,15 @@ export function CartProvider({ children }) {
   }, []);
 
   const loadLibrary = useCallback(async () => {
+    if (!isLoggedIn) {
+      setLibrary([]);
+      return [];
+    }
+
     const data = await api.listLibrary();
     setLibrary(data || []);
     return data;
-  }, []);
+  }, [isLoggedIn]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -35,7 +42,7 @@ export function CartProvider({ children }) {
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, user?.id]);
 
   const addToCart = useCallback(async (game) => {
     setLastError("");

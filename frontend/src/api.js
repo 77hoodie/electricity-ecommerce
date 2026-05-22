@@ -1,9 +1,22 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3333/api";
+const STORAGE_KEY = "electricity-user";
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 async function request(path, options = {}) {
+  const user = getStoredUser();
+
   const response = await fetch(`${API_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(user?.id ? { "X-User-Id": String(user.id) } : {}),
       ...(options.headers || {})
     },
     ...options
@@ -31,6 +44,10 @@ async function request(path, options = {}) {
 
 export const api = {
   health: () => request("/health"),
+
+  register: (payload) => request("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+  login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+  me: () => request("/auth/me"),
 
   listGames: () => request("/games"),
   getGame: (id) => request(`/games/${id}`),
