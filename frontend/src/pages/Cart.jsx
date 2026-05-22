@@ -3,20 +3,38 @@ import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 
 export default function Cart() {
-  const { items, removeFromCart, changeQty, clearCart, purchaseCart, total } = useCart();
+  const { items, removeFromCart, clearCart, purchaseCart, total, loading, lastError } = useCart();
   const [purchased, setPurchased] = useState(false);
+  const [localError, setLocalError] = useState("");
 
-  function handleCheckout() {
-    purchaseCart();
-    setPurchased(true);
+  async function handleCheckout() {
+    const result = await purchaseCart();
+    if (result.ok) {
+      setPurchased(true);
+      setLocalError("");
+    } else {
+      setLocalError(result.message);
+    }
   }
+
+  async function handleRemove(id) {
+    const result = await removeFromCart(id);
+    if (!result.ok) setLocalError(result.message);
+  }
+
+  async function handleClear() {
+    const result = await clearCart();
+    if (!result.ok) setLocalError(result.message);
+  }
+
+  if (loading) return <p>Carregando carrinho...</p>;
 
   if (purchased) {
     return (
       <section className="empty-state" style={{ textAlign: "center" }}>
         <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎮</div>
         <h1>Compra realizada!</h1>
-        <p>Seus jogos foram adicionados à biblioteca. Obrigado!</p>
+        <p>O pedido foi salvo no banco e os jogos foram adicionados à biblioteca.</p>
         <div className="hero-actions" style={{ justifyContent: "center", marginTop: "1.5rem" }}>
           <Link className="button" to="/library">Ver biblioteca</Link>
           <Link className="button secondary" to="/catalog">Continuar comprando</Link>
@@ -30,6 +48,7 @@ export default function Cart() {
       <section className="empty-state">
         <h1>Carrinho</h1>
         <p className="muted">Seu carrinho está vazio. Adicione jogos do catálogo para começar.</p>
+        {(lastError || localError) && <p className="error">{lastError || localError}</p>}
         <div className="hero-actions" style={{ marginTop: "1.5rem" }}>
           <Link className="button" to="/catalog">Ver catálogo</Link>
         </div>
@@ -43,9 +62,12 @@ export default function Cart() {
         <div>
           <p className="eyebrow">Loja</p>
           <h1>Carrinho</h1>
+          <p className="muted">Carrinho persistido no PostgreSQL. Como os jogos são digitais, cada jogo pode aparecer apenas uma vez.</p>
         </div>
-        <button className="button secondary" onClick={clearCart}>Limpar carrinho</button>
+        <button className="button secondary" onClick={handleClear}>Limpar carrinho</button>
       </div>
+
+      {(lastError || localError) && <p className="error">{lastError || localError}</p>}
 
       <div className="table-card" style={{ marginBottom: "1.5rem" }}>
         {items.map((item) => (
@@ -64,17 +86,15 @@ export default function Cart() {
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <button className="qty-btn" onClick={() => changeQty(item.id, -1)}>−</button>
-              <span style={{ minWidth: 24, textAlign: "center", fontWeight: 700 }}>{item.qty}</span>
-              <button className="qty-btn" onClick={() => changeQty(item.id, +1)}>+</button>
+            <div style={{ textAlign: "center" }}>
+              <span className="pill">Digital</span>
             </div>
 
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontWeight: 700 }}>R$ {(item.price * item.qty).toFixed(2)}</div>
+              <div style={{ fontWeight: 700 }}>R$ {Number(item.price).toFixed(2)}</div>
               <button
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.8rem", padding: 0, color: "#f87171" }}
-                onClick={() => removeFromCart(item.id)}
+                onClick={() => handleRemove(item.id)}
               >
                 remover
               </button>
@@ -85,7 +105,7 @@ export default function Cart() {
 
       <div className="cart-summary">
         <div className="cart-summary-line">
-          <span className="muted">{items.reduce((s, i) => s + i.qty, 0)} item(s)</span>
+          <span className="muted">{items.length} jogo(s)</span>
           <span style={{ fontWeight: 800, fontSize: "1.4rem" }}>R$ {total.toFixed(2)}</span>
         </div>
         <button className="button" style={{ width: "100%", padding: "1rem" }} onClick={handleCheckout}>

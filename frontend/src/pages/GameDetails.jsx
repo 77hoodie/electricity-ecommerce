@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useCart } from "../context/CartContext.jsx";
-import React from "react";
 
 export default function GameDetails() {
   const { id } = useParams();
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [added, setAdded] = useState(false);
+  const [status, setStatus] = useState({ type: "", message: "" });
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -19,10 +18,9 @@ export default function GameDetails() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  function handleAddToCart() {
-    addToCart(game);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+  async function handleAddToCart() {
+    const result = await addToCart(game);
+    setStatus({ type: result.ok ? "success" : "error", message: result.message });
   }
 
   if (loading) return <p>Carregando detalhes...</p>;
@@ -42,11 +40,12 @@ export default function GameDetails() {
         <p><strong>Gêneros:</strong> {game.genres?.join(", ") || "Não informado"}</p>
         <p><strong>Plataformas:</strong> {game.platforms?.slice(0, 8).join(", ") || "Não informado"}</p>
         <div className="hero-actions">
-          <button className={`button${added ? " button-added" : ""}`} onClick={handleAddToCart}>
-            {added ? "✓ Adicionado!" : "Adicionar ao carrinho"}
+          <button className={`button${status.type === "success" ? " button-added" : ""}`} onClick={handleAddToCart}>
+            {status.type === "success" ? "✓ Adicionado!" : "Adicionar ao carrinho"}
           </button>
           <Link className="button secondary" to="/catalog">Voltar ao catálogo</Link>
         </div>
+        {status.message && <p className={status.type === "success" ? "success" : "error"}>{status.message}</p>}
       </div>
     </section>
   );

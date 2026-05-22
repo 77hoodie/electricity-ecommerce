@@ -1,15 +1,22 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 
 export default function Library() {
-  const { library } = useCart();
+  const { library, loading, refresh, lastError } = useCart();
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  if (loading) return <p>Carregando biblioteca...</p>;
 
   if (library.length === 0) {
     return (
       <section className="empty-state">
         <h1>Biblioteca</h1>
         <p className="muted">Você ainda não possui jogos. Finalize uma compra no carrinho para vê-los aqui.</p>
+        {lastError && <p className="error">{lastError}</p>}
         <div className="hero-actions" style={{ marginTop: "1.5rem" }}>
           <Link className="button" to="/catalog">Ver catálogo</Link>
         </div>
@@ -23,6 +30,7 @@ export default function Library() {
         <div>
           <p className="eyebrow">Minha conta</p>
           <h1>Biblioteca</h1>
+          <p className="muted">Jogos adquiridos persistidos no banco.</p>
         </div>
         <span className="muted">{library.length} jogo(s)</span>
       </div>

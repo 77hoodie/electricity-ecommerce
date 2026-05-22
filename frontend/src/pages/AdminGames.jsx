@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
-import React from "react";
+
+const emptyForm = {
+  title: "",
+  price: "",
+  description: "",
+  coverUrl: "",
+  genres: "",
+  platforms: ""
+};
 
 export default function AdminGames() {
   const [games, setGames] = useState([]);
-  const [form, setForm] = useState({ title: "", price: "", description: "" });
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -17,21 +26,48 @@ export default function AdminGames() {
     loadGames().catch((err) => setError(err.message));
   }, []);
 
-  async function handleCreate(event) {
+  function startEdit(game) {
+    setEditingId(game.id);
+    setForm({
+      title: game.title || "",
+      price: String(game.price ?? ""),
+      description: game.description || "",
+      coverUrl: game.coverUrl || "",
+      genres: game.genres?.join(", ") || "",
+      platforms: game.platforms?.join(", ") || ""
+    });
+    setMessage("");
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
     setError("");
     setMessage("");
 
+    const payload = {
+      title: form.title,
+      price: Number(form.price),
+      description: form.description,
+      coverUrl: form.coverUrl,
+      genres: form.genres,
+      platforms: form.platforms
+    };
+
     try {
-      await api.createGame({
-        title: form.title,
-        price: Number(form.price),
-        description: form.description,
-        genres: ["Manual"],
-        platforms: ["PC"]
-      });
-      setForm({ title: "", price: "", description: "" });
-      setMessage("Jogo cadastrado com sucesso.");
+      if (editingId) {
+        await api.updateGame(editingId, payload);
+        setMessage("Jogo atualizado com sucesso.");
+      } else {
+        await api.createGame(payload);
+        setMessage("Jogo cadastrado com sucesso.");
+      }
+      cancelEdit();
       await loadGames();
     } catch (err) {
       setError(err.message);
@@ -56,17 +92,23 @@ export default function AdminGames() {
       <div className="page-title">
         <div>
           <p className="eyebrow">Administração</p>
-          <h1>CRUD simples de jogos</h1>
-          <p className="muted">Nesta Sprint 1, o CRUD usa dados em memória no back-end.</p>
+          <h1>CRUD de jogos</h1>
+          <p className="muted">Operações persistidas no PostgreSQL via Prisma.</p>
         </div>
       </div>
 
-      <form className="card-form" onSubmit={handleCreate}>
-        <h2>Cadastrar jogo manualmente</h2>
+      <form className="card-form" onSubmit={handleSubmit}>
+        <h2>{editingId ? "Editar jogo" : "Cadastrar jogo manualmente"}</h2>
         <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Título" />
-        <input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Preço" />
+        <input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Preço" type="number" min="0" step="0.01" />
+        <input value={form.coverUrl} onChange={(event) => setForm({ ...form, coverUrl: event.target.value })} placeholder="URL da capa" />
+        <input value={form.genres} onChange={(event) => setForm({ ...form, genres: event.target.value })} placeholder="Gêneros separados por vírgula" />
+        <input value={form.platforms} onChange={(event) => setForm({ ...form, platforms: event.target.value })} placeholder="Plataformas separadas por vírgula" />
         <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descrição" />
-        <button className="button">Cadastrar</button>
+        <div className="hero-actions">
+          <button className="button">{editingId ? "Salvar alterações" : "Cadastrar"}</button>
+          {editingId && <button type="button" className="button secondary" onClick={cancelEdit}>Cancelar</button>}
+        </div>
       </form>
 
       {message && <p className="success">{message}</p>}
@@ -78,7 +120,10 @@ export default function AdminGames() {
           <div className="table-row" key={game.id}>
             <span>{game.title}</span>
             <span>R$ {Number(game.price).toFixed(2)}</span>
-            <button className="danger" onClick={() => handleDelete(game.id)}>Desativar</button>
+            <div className="table-actions">
+              <button className="button secondary compact" onClick={() => startEdit(game)}>Editar</button>
+              <button className="danger compact" onClick={() => handleDelete(game.id)}>Desativar</button>
+            </div>
           </div>
         ))}
       </div>

@@ -1,47 +1,80 @@
 # Electricity
 
-Este repositório contém um protótipo simples de uma plataforma web de venda simulada de jogos digitais, inspirada na Steam.
+Electricity é uma plataforma web de venda simulada de jogos digitais, inspirada na Steam. Esta versão corresponde à segunda entrega do projeto e inclui front-end navegável, back-end com lógica de negócio, persistência em banco PostgreSQL via Prisma, integração com a RAWG API, carrinho funcional e início da suíte de testes.
 
-Essa primeira versão demonstra:
+## Funcionalidades implementadas
 
-- Front-end navegável com React + Vite.
-- Back-end com Node.js + Express.
-- CRUD simples de jogos em memória.
-- Integração inicial com a RAWG API.
-- Fluxo de importação de jogos externos para o catálogo local.
+- Catálogo de jogos persistido no banco.
+- CRUD completo de jogos.
+- CRUD completo de gêneros.
+- Integração com RAWG API para busca e importação de jogos.
+- Carrinho persistido no PostgreSQL.
+- Regra de negócio para impedir jogo duplicado no carrinho.
+- Regra de negócio para impedir compra de jogo já presente na biblioteca.
+- Checkout simulado com criação de pedido.
+- Biblioteca persistida após a compra.
+- Testes unitários estruturados.
+- Testes de integração iniciados.
+- Documentação inicial dos casos de teste em `docs/casos-de-teste.md`.
 
----
+## Tecnologias utilizadas
+
+### Front-end
+
+- React
+- Vite
+- React Router
+
+### Back-end
+
+- Node.js
+- Express
+- Prisma ORM
+- PostgreSQL
+- RAWG API
+
+### Testes
+
+- Vitest
+- Supertest
 
 ## Estrutura do projeto
 
 ```txt
 electricity-ecommerce/
+├── docker-compose.yml
+├── README.md
+├── docs/
+│   └── casos-de-teste.md
 ├── backend/
 │   ├── package.json
 │   ├── server.js
-│   └── .env.example
-│
-├── frontend/
-│   ├── package.json
-│   ├── index.html
-│   └── src/
-│       ├── App.jsx
-│       ├── api.js
-│       ├── main.jsx
-│       ├── styles.css
-│       ├── components/
-│       │   └── GameCard.jsx
-│       └── pages/
-│           ├── Home.jsx
-│           ├── Catalog.jsx
-│           ├── GameDetails.jsx
-│           ├── AdminGames.jsx
-│           ├── AdminRawgImport.jsx
-│           ├── Cart.jsx
-│           └── Library.jsx
+│   ├── .env.example
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── seed.js
+│   ├── src/
+│   │   ├── app.js
+│   │   ├── cartRules.js
+│   │   ├── errors.js
+│   │   ├── prisma.js
+│   │   ├── rawgMapper.js
+│   │   └── serializers.js
+│   └── tests/
+│       ├── unit/
+│       └── integration/
+└── frontend/
+    ├── package.json
+    ├── index.html
+    └── src/
+        ├── App.jsx
+        ├── api.js
+        ├── main.jsx
+        ├── styles.css
+        ├── components/
+        ├── context/
+        └── pages/
 ```
-
----
 
 ## Pré-requisitos
 
@@ -49,61 +82,63 @@ Antes de executar, instale:
 
 - Node.js 20 ou superior
 - npm
+- Docker
+- Docker Compose
 - Chave da RAWG API
-
----
-
-## Como obter a chave da RAWG API
-
-1. Acesse o site da RAWG API.
-2. Crie uma conta.
-3. Gere uma API Key.
-4. Use a chave no arquivo `.env` do back-end.
-
----
 
 ## Instalação e execução
 
-### 1. Baixar o projeto
-
-Se estiver usando o `.zip`, extraia a pasta `electricity-ecommerce`.
-
-Depois entre na pasta:
+### 1. Entrar na pasta do projeto
 
 ```bash
 cd electricity-ecommerce
 ```
 
----
+### 2. Subir o PostgreSQL
 
-### 2. Configurar o back-end
+Na raiz do projeto:
 
-Entre na pasta do back-end:
+```bash
+docker compose up -d
+```
+
+O banco ficará disponível em:
+
+```txt
+postgresql://postgres:postgres@localhost:5432/electricity
+```
+
+### 3. Configurar o back-end
 
 ```bash
 cd backend
-```
-
-Instale as dependências:
-
-```bash
 npm install
-```
-
-Crie o arquivo `.env` copiando o exemplo:
-
-```bash
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` e preencha sua chave:
+Abra o arquivo `.env` e configure sua chave da RAWG:
 
 ```env
 PORT=3333
-RAWG_API_KEY=sua_chave_da_rawg_aqui
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/electricity?schema=public"
+RAWG_API_KEY="sua_chave_da_rawg_aqui"
 ```
 
-Inicie o back-end:
+### 4. Criar as tabelas no banco
+
+Ainda dentro de `backend`:
+
+```bash
+npm run db:push
+```
+
+### 5. Popular dados iniciais
+
+```bash
+npm run db:seed
+```
+
+### 6. Rodar o back-end
 
 ```bash
 npm run dev
@@ -115,31 +150,19 @@ O back-end ficará disponível em:
 http://localhost:3333
 ```
 
-Para testar se está funcionando, acesse:
+Teste de saúde da API:
 
 ```txt
 http://localhost:3333/api/health
 ```
 
----
+### 7. Rodar o front-end
 
-### 3. Configurar o front-end
-
-Abra outro terminal, volte para a raiz do projeto e entre no front-end:
+Em outro terminal:
 
 ```bash
 cd electricity-ecommerce/frontend
-```
-
-Instale as dependências:
-
-```bash
 npm install
-```
-
-Inicie o front-end:
-
-```bash
 npm run dev
 ```
 
@@ -149,43 +172,15 @@ O front-end ficará disponível em:
 http://localhost:5173
 ```
 
----
+## Endpoints principais
 
-## Fluxo para apresentar
-
-Durante a apresentação, siga este roteiro:
-
-1. Acesse `http://localhost:5173`.
-2. Abra a página **Catálogo**.
-3. Mostre que existem jogos locais carregados do back-end.
-4. Acesse **Importar RAWG**.
-5. Pesquise um jogo, por exemplo `elden ring`.
-6. Mostre os resultados vindos da RAWG API.
-7. Clique em **Importar para catálogo**.
-8. Volte ao **Catálogo**.
-9. Mostre que o jogo importado aparece na listagem.
-10. Clique em **Ver detalhes**.
-
-Esse fluxo demonstra:
-
-- Front-end navegável.
-- Back-end funcional.
-- Comunicação front-end → back-end.
-- Comunicação back-end → RAWG API.
-- Persistência temporária em memória.
-- CRUD simples de jogos.
-
----
-
-## Endpoints disponíveis
-
-### Saúde da API
+### Saúde
 
 ```http
 GET /api/health
 ```
 
-### Jogos locais
+### Jogos
 
 ```http
 GET /api/games
@@ -195,6 +190,15 @@ PUT /api/games/:id
 DELETE /api/games/:id
 ```
 
+### Gêneros
+
+```http
+GET /api/genres
+POST /api/genres
+PUT /api/genres/:id
+DELETE /api/genres/:id
+```
+
 ### RAWG API
 
 ```http
@@ -202,24 +206,70 @@ GET /api/rawg/search?query=elden-ring
 POST /api/rawg/import/:rawgId
 ```
 
----
+### Carrinho, pedidos e biblioteca
 
-## Observações importantes
+```http
+GET /api/cart
+POST /api/cart/items
+DELETE /api/cart/items/:id
+DELETE /api/cart
+POST /api/orders/checkout
+GET /api/orders
+GET /api/library
+```
 
-- A chave da RAWG fica somente no back-end.
-- O front-end nunca chama a RAWG diretamente.
-- Os dados importados ficam em memória e somem ao reiniciar o back-end.
-- Para a versão final, recomenda-se trocar a memória por PostgreSQL + Prisma.
+## Fluxo para apresentação
 
----
+1. Subir o banco com `docker compose up -d`.
+2. Rodar `npm run db:push` e `npm run db:seed` no back-end.
+3. Rodar back-end e front-end.
+4. Abrir `http://localhost:5173`.
+5. Acessar **Admin Jogos** e demonstrar criação, edição e desativação de jogos.
+6. Acessar **Admin Gêneros** e demonstrar criação, edição e exclusão de gêneros.
+7. Acessar **Importar RAWG** e buscar um jogo, por exemplo `elden ring`.
+8. Importar o jogo para o catálogo.
+9. Voltar ao **Catálogo** e verificar que o jogo aparece.
+10. Adicionar um jogo ao carrinho.
+11. Tentar adicionar o mesmo jogo novamente e mostrar a regra de bloqueio.
+12. Finalizar a compra.
+13. Abrir a **Biblioteca** e mostrar o jogo comprado persistido.
 
-## Próximos passos sugeridos
+## Testes
 
-- Adicionar PostgreSQL.
-- Adicionar Prisma.
-- Criar autenticação com usuário e administrador.
-- Persistir jogos importados no banco.
-- Implementar carrinho real.
-- Implementar pedidos.
-- Implementar biblioteca de jogos comprados.
-- Adicionar testes unitários, integração e e2e.
+### Testes unitários
+
+```bash
+cd backend
+npm run test:unit
+```
+
+Os testes unitários validam regras como:
+
+- adicionar jogo ativo ao carrinho;
+- bloquear jogo duplicado no carrinho;
+- bloquear jogo já presente na biblioteca;
+- calcular o total do carrinho.
+
+### Testes de integração
+
+Os testes de integração dependem do banco PostgreSQL ativo e das tabelas criadas.
+
+```bash
+cd backend
+RUN_INTEGRATION=true npm run test:integration
+```
+
+No Windows PowerShell:
+
+```powershell
+$env:RUN_INTEGRATION="true"; npm run test:integration
+```
+
+## Observações
+
+- O arquivo `.env` não deve ser enviado ao GitHub.
+- O arquivo `.env.example` deve ser versionado.
+- A chave da RAWG fica apenas no back-end.
+- O front-end não chama a RAWG diretamente.
+- O carrinho desta versão usa um usuário demonstrativo global, pois autenticação real ainda não foi implementada.
+- Como os produtos são jogos digitais, o carrinho não permite duplicidade do mesmo jogo.

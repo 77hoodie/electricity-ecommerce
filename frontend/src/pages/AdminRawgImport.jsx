@@ -32,7 +32,7 @@ export default function AdminRawgImport() {
 
     try {
       const imported = await api.importRawg(rawgId, Number(price));
-      setMessage(`Jogo importado com sucesso: ${imported.title}`);
+      setMessage(`Jogo importado e salvo no banco com sucesso: ${imported.title}`);
     } catch (err) {
       setError(err.message);
     }
@@ -44,7 +44,7 @@ export default function AdminRawgImport() {
         <div>
           <p className="eyebrow">Administração</p>
           <h1>Importar jogos da RAWG</h1>
-          <p className="muted">Essa tela demonstra a integração entre front-end, back-end e API externa.</p>
+          <p className="muted">Essa tela demonstra a integração entre front-end, back-end, RAWG API e persistência no PostgreSQL.</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default function AdminRawgImport() {
       <div className="rawg-list">
         {results.map((game) => (
           <article key={game.rawgId} className="rawg-item">
-            <img src={game.coverUrl || "https://placehold.co/200x120?text=GameHub"} alt={game.title} />
+            <img src={game.coverUrl || "https://placehold.co/200x120?text=Electricity"} alt={game.title} />
             <div>
               <h3>{game.title}</h3>
               <p className="muted">{game.genres?.slice(0, 3).join(" • ") || "Sem gênero"}</p>

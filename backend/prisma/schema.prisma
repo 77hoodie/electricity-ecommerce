@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+model Game {
+  id          Int      @id @default(autoincrement())
+  rawgId      Int?     @unique
+  title       String
+  description String   @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  coverUrl    String?
+  rating      Float    @default(0)
+  genres      String[] @default([])
+  platforms   String[] @default([])
+  releaseDate DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cartItems    CartItem[]
+  libraryItems LibraryItem[]
+  orderItems   OrderItem[]
+}
+
+model Genre {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CartItem {
+  id            Int      @id @default(autoincrement())
+  gameId        Int      @unique
+  priceAtMoment Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model LibraryItem {
+  id          Int      @id @default(autoincrement())
+  gameId      Int      @unique
+  purchasedAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PAID)
+  createdAt DateTime    @default(now())
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id              Int     @id @default(autoincrement())
+  orderId          Int
+  gameId           Int
+  priceAtPurchase  Decimal @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  game  Game  @relation(fields: [gameId], references: [id])
+}

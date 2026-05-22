@@ -1,16 +1,16 @@
-import { Link } from "react-router-dom";
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 
 export default function GameCard({ game }) {
   const { addToCart } = useCart();
-  const [added, setAdded] = useState(false);
+  const [status, setStatus] = useState({ type: "", message: "" });
 
-  function handleAdd(e) {
+  async function handleAdd(e) {
     e.preventDefault();
-    addToCart(game);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1800);
+    const result = await addToCart(game);
+    setStatus({ type: result.ok ? "success" : "error", message: result.message });
+    setTimeout(() => setStatus({ type: "", message: "" }), 2200);
   }
 
   return (
@@ -20,9 +20,10 @@ export default function GameCard({ game }) {
         <h3>{game.title}</h3>
         <p className="muted">{game.genres?.slice(0, 3).join(" • ") || "Sem gênero"}</p>
         <strong>R$ {Number(game.price).toFixed(2)}</strong>
-        <button className={`button${added ? " button-added" : ""}`} onClick={handleAdd}>
-          {added ? "✓ No carrinho" : "Adicionar ao carrinho"}
+        <button className={`button${status.type === "success" ? " button-added" : ""}`} onClick={handleAdd}>
+          {status.type === "success" ? "✓ No carrinho" : "Adicionar ao carrinho"}
         </button>
+        {status.type === "error" && <small className="inline-error">{status.message}</small>}
         <Link className="button secondary" to={`/games/${game.id}`}>Ver detalhes</Link>
       </div>
     </article>

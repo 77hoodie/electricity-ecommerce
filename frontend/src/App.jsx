@@ -1,9 +1,10 @@
-import { NavLink, Outlet } from "react-router-dom";
 import React from "react";
+import { NavLink, Outlet } from "react-router-dom";
 import { useCart } from "./context/CartContext.jsx";
 
 export default function App() {
   const { count } = useCart();
+
   return (
     <div className="app">
       <header className="header">
@@ -16,6 +17,7 @@ export default function App() {
           </NavLink>
           <NavLink to="/library">Biblioteca</NavLink>
           <NavLink to="/admin/games">Admin Jogos</NavLink>
+          <NavLink to="/admin/genres">Admin Gêneros</NavLink>
           <NavLink to="/admin/rawg-import">Importar RAWG</NavLink>
         </nav>
       </header>

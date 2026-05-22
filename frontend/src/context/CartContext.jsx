@@ -1,55 +1,107 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { api } from "../api.js";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [library, setLibrary] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastError, setLastError] = useState("");
 
-  const addToCart = useCallback((game) => {
-    setItems((prev) => {
-      const existing = prev.find((item) => item.id === game.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === game.id ? { ...item, qty: item.qty + 1 } : item
-        );
-      }
-      return [...prev, { ...game, qty: 1 }];
-    });
+  const loadCart = useCallback(async () => {
+    const data = await api.getCart();
+    setItems(data.items || []);
+    return data;
   }, []);
 
-  const removeFromCart = useCallback((id) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const loadLibrary = useCallback(async () => {
+    const data = await api.listLibrary();
+    setLibrary(data || []);
+    return data;
   }, []);
 
-  const changeQty = useCallback((id, delta) => {
-    setItems((prev) =>
-      prev
-        .map((item) => item.id === id ? { ...item, qty: item.qty + delta } : item)
-        .filter((item) => item.qty > 0)
-    );
-  }, []);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setLastError("");
+    try {
+      await Promise.all([loadCart(), loadLibrary()]);
+    } catch (error) {
+      setLastError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCart, loadLibrary]);
 
-  const clearCart = useCallback(() => setItems([]), []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
-  const purchaseCart = useCallback(() => {
-    setLibrary((prev) => {
-      const merged = [...prev];
-      items.forEach((item) => {
-        if (!merged.find((g) => g.id === item.id)) {
-          merged.push({ ...item });
-        }
-      });
-      return merged;
-    });
-    setItems([]);
-  }, [items]);
+  const addToCart = useCallback(async (game) => {
+    setLastError("");
+    try {
+      await api.addCartItem(game.id);
+      await loadCart();
+      return { ok: true, message: "Jogo adicionado ao carrinho." };
+    } catch (error) {
+      setLastError(error.message);
+      return { ok: false, message: error.message };
+    }
+  }, [loadCart]);
 
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const count = items.reduce((sum, item) => sum + item.qty, 0);
+  const removeFromCart = useCallback(async (cartItemId) => {
+    setLastError("");
+    try {
+      await api.removeCartItem(cartItemId);
+      await loadCart();
+      return { ok: true };
+    } catch (error) {
+      setLastError(error.message);
+      return { ok: false, message: error.message };
+    }
+  }, [loadCart]);
+
+  const clearCart = useCallback(async () => {
+    setLastError("");
+    try {
+      await api.clearCart();
+      await loadCart();
+      return { ok: true };
+    } catch (error) {
+      setLastError(error.message);
+      return { ok: false, message: error.message };
+    }
+  }, [loadCart]);
+
+  const purchaseCart = useCallback(async () => {
+    setLastError("");
+    try {
+      const order = await api.checkout();
+      await Promise.all([loadCart(), loadLibrary()]);
+      return { ok: true, order };
+    } catch (error) {
+      setLastError(error.message);
+      return { ok: false, message: error.message };
+    }
+  }, [loadCart, loadLibrary]);
+
+  const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.price), 0), [items]);
+  const count = items.length;
 
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, changeQty, clearCart, purchaseCart, library, total, count }}>
+    <CartContext.Provider value={{
+      items,
+      addToCart,
+      removeFromCart,
+      clearCart,
+      purchaseCart,
+      library,
+      total,
+      count,
+      loading,
+      lastError,
+      refresh
+    }}>
       {children}
     </CartContext.Provider>
   );

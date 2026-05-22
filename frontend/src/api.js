@@ -31,10 +31,26 @@ async function request(path, options = {}) {
 
 export const api = {
   health: () => request("/health"),
+
   listGames: () => request("/games"),
   getGame: (id) => request(`/games/${id}`),
   createGame: (game) => request("/games", { method: "POST", body: JSON.stringify(game) }),
+  updateGame: (id, game) => request(`/games/${id}`, { method: "PUT", body: JSON.stringify(game) }),
   deleteGame: (id) => request(`/games/${id}`, { method: "DELETE" }),
+
+  listGenres: () => request("/genres"),
+  createGenre: (genre) => request("/genres", { method: "POST", body: JSON.stringify(genre) }),
+  updateGenre: (id, genre) => request(`/genres/${id}`, { method: "PUT", body: JSON.stringify(genre) }),
+  deleteGenre: (id) => request(`/genres/${id}`, { method: "DELETE" }),
+
+  getCart: () => request("/cart"),
+  addCartItem: (gameId) => request("/cart/items", { method: "POST", body: JSON.stringify({ gameId }) }),
+  removeCartItem: (cartItemId) => request(`/cart/items/${cartItemId}`, { method: "DELETE" }),
+  clearCart: () => request("/cart", { method: "DELETE" }),
+  checkout: () => request("/orders/checkout", { method: "POST" }),
+  listLibrary: () => request("/library"),
+  listOrders: () => request("/orders"),
+
   searchRawg: (query) => request(`/rawg/search?query=${encodeURIComponent(query)}`),
   importRawg: (rawgId, price) =>
     request(`/rawg/import/${rawgId}`, {
