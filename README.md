@@ -1,6 +1,6 @@
 # Electricity
 
-Electricity é uma plataforma web de venda simulada de jogos digitais, inspirada na Steam. Esta versão corresponde à segunda entrega do projeto e inclui front-end navegável, back-end com lógica de negócio, persistência em banco PostgreSQL via Prisma, integração com a RAWG API, carrinho funcional e início da suíte de testes.
+Electricity é uma plataforma web de venda simulada de jogos digitais, inspirada na Steam. Esta versão inclui front-end navegável, back-end com lógica de negócio, persistência em banco PostgreSQL via Prisma, integração com a RAWG API, carrinho funcional e início da suíte de testes.
 
 ## Funcionalidades implementadas
 
