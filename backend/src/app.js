@@ -84,8 +84,9 @@ async function requireAdmin(req, _res, next) {
   }
 }
 
-async function getCartItems() {
+async function getCartItems(userId = null) {
   return prisma.cartItem.findMany({
+    where: { userId: userId ?? null },
     include: { game: true },
     orderBy: { createdAt: "asc" }
   });
@@ -353,9 +354,10 @@ app.post("/api/rawg/import/:rawgId", requireAdmin, async (req, res, next) => {
 });
 
 // Cart and checkout
-app.get("/api/cart", async (_req, res, next) => {
+app.get("/api/cart", async (req, res, next) => {
   try {
-    const items = await getCartItems();
+    const currentUser = await getRequestUser(req);
+    const items = await getCartItems(currentUser?.id ?? null);
     res.json({
       items: items.map(serializeCartItem),
       total: calculateCartTotal(items)
@@ -369,9 +371,10 @@ app.post("/api/cart/items", async (req, res, next) => {
   try {
     const gameId = parseId(req.body.gameId);
     const currentUser = await getRequestUser(req);
+    const userId = currentUser?.id ?? null;
     const [game, existingCartItem, existingLibraryItem] = await Promise.all([
       prisma.game.findUnique({ where: { id: gameId } }),
-      prisma.cartItem.findUnique({ where: { gameId } }),
+      prisma.cartItem.findUnique({ where: { userId_gameId: { userId, gameId } } }),
       currentUser
         ? prisma.libraryItem.findFirst({ where: { gameId, userId: currentUser.id } })
         : Promise.resolve(null)
@@ -380,7 +383,7 @@ app.post("/api/cart/items", async (req, res, next) => {
     assertCanAddToCart({ game, existingCartItem, existingLibraryItem });
 
     const item = await prisma.cartItem.create({
-      data: { gameId, priceAtMoment: game.price },
+      data: { userId, gameId, priceAtMoment: game.price },
       include: { game: true }
     });
 
@@ -401,9 +404,10 @@ app.delete("/api/cart/items/:id", async (req, res, next) => {
   }
 });
 
-app.delete("/api/cart", async (_req, res, next) => {
+app.delete("/api/cart", async (req, res, next) => {
   try {
-    await prisma.cartItem.deleteMany();
+    const currentUser = await getRequestUser(req);
+    await prisma.cartItem.deleteMany({ where: { userId: currentUser?.id ?? null } });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -412,7 +416,7 @@ app.delete("/api/cart", async (_req, res, next) => {
 
 app.post("/api/orders/checkout", requireAuth, async (req, res, next) => {
   try {
-    const cartItems = await getCartItems();
+    const cartItems = await getCartItems(req.user.id);
     if (cartItems.length === 0) throw new HttpError(400, "Carrinho vazio");
 
     const total = calculateCartTotal(cartItems);
@@ -441,7 +445,7 @@ app.post("/api/orders/checkout", requireAuth, async (req, res, next) => {
         });
       }
 
-      await tx.cartItem.deleteMany();
+      await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
       return createdOrder;
     });
 

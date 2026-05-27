@@ -29,6 +29,7 @@ model User {
 
   orders       Order[]
   libraryItems LibraryItem[]
+  cartItems    CartItem[]
 }
 
 model Game {
@@ -60,11 +61,15 @@ model Genre {
 
 model CartItem {
   id            Int      @id @default(autoincrement())
-  gameId        Int      @unique
+  userId        Int?
+  gameId        Int
   priceAtMoment Decimal  @db.Decimal(10, 2)
   createdAt     DateTime @default(now())
 
-  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
 }
 
 model LibraryItem {
