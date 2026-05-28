@@ -37,6 +37,12 @@ export function AuthProvider({ children }) {
     return createdUser;
   }, [saveUser]);
 
+  const updateProfile = useCallback(async (payload) => {
+    const updatedUser = await api.updateProfile(payload);
+    saveUser(updatedUser);
+    return updatedUser;
+  }, [saveUser]);
+
   const logout = useCallback(() => {
     saveUser(null);
   }, [saveUser]);
@@ -47,8 +53,9 @@ export function AuthProvider({ children }) {
     isAdmin: user?.role === "ADMIN",
     login,
     register,
+    updateProfile,
     logout
-  }), [user, login, register, logout]);
+  }), [user, login, register, updateProfile, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

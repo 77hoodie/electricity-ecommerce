@@ -18,9 +18,10 @@ export default function App() {
             {count > 0 && <span className="cart-badge">{count}</span>}
           </NavLink>
           {isLoggedIn && <NavLink to="/library">Biblioteca</NavLink>}
-          {isAdmin && <NavLink to="/admin/games">Admin Jogos</NavLink>}
-          {isAdmin && <NavLink to="/admin/genres">Admin Gêneros</NavLink>}
-          {isAdmin && <NavLink to="/admin/rawg-import">Importar RAWG</NavLink>}
+          {isLoggedIn && <NavLink to="/wishlist">Desejos</NavLink>}
+          {isLoggedIn && <NavLink to="/orders">Pedidos</NavLink>}
+          {isLoggedIn && <NavLink to="/profile">Perfil</NavLink>}
+          {isAdmin && <NavLink to="/admin/games">Painel</NavLink>}
         </nav>
         <div className="auth-area">
           {isLoggedIn ? (
@@ -36,6 +37,17 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {isAdmin && (
+        <div className="admin-bar">
+          <NavLink to="/admin/games">Jogos</NavLink>
+          <NavLink to="/admin/genres">Gêneros</NavLink>
+          <NavLink to="/admin/platforms">Plataformas</NavLink>
+          <NavLink to="/admin/promotions">Promoções</NavLink>
+          <NavLink to="/admin/users">Usuários</NavLink>
+          <NavLink to="/admin/rawg-import">RAWG</NavLink>
+        </div>
+      )}
 
       <main className="container">
         <Outlet />

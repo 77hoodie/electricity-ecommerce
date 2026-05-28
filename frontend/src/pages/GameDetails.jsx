@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../api";
+import { api } from "../api.js";
 import { useCart } from "../context/CartContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function GameDetails() {
   const { id } = useParams();
@@ -10,6 +11,7 @@ export default function GameDetails() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState({ type: "", message: "" });
   const { addToCart } = useCart();
+  const { isLoggedIn } = useAuth();
 
   useEffect(() => {
     api.getGame(id)
@@ -21,6 +23,20 @@ export default function GameDetails() {
   async function handleAddToCart() {
     const result = await addToCart(game);
     setStatus({ type: result.ok ? "success" : "error", message: result.message });
+  }
+
+  async function handleWishlist() {
+    if (!isLoggedIn) {
+      setStatus({ type: "error", message: "Faça login para usar a lista de desejos." });
+      return;
+    }
+
+    try {
+      await api.addWishlist(game.id);
+      setStatus({ type: "success", message: "Jogo adicionado à lista de desejos." });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    }
   }
 
   if (loading) return <p>Carregando detalhes...</p>;
@@ -41,8 +57,9 @@ export default function GameDetails() {
         <p><strong>Plataformas:</strong> {game.platforms?.slice(0, 8).join(", ") || "Não informado"}</p>
         <div className="hero-actions">
           <button className={`button${status.type === "success" ? " button-added" : ""}`} onClick={handleAddToCart}>
-            {status.type === "success" ? "✓ Adicionado!" : "Adicionar ao carrinho"}
+            {status.type === "success" ? "✓ Adicionado" : "Adicionar ao carrinho"}
           </button>
+          <button className="button secondary" onClick={handleWishlist}>Adicionar aos desejos</button>
           <Link className="button secondary" to="/catalog">Voltar ao catálogo</Link>
         </div>
         {status.message && <p className={status.type === "success" ? "success" : "error"}>{status.message}</p>}

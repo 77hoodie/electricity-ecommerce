@@ -54,9 +54,9 @@ export default function AdminRawgImport() {
     <section>
       <div className="page-title">
         <div>
-          <p className="eyebrow">Administração</p>
+          <p className="eyebrow">Painel da loja</p>
           <h1>Importar jogos da RAWG</h1>
-          <p className="muted">Essa tela demonstra a integração entre front-end, back-end, RAWG API e persistência no PostgreSQL.</p>
+          <p className="muted">Busque jogos na RAWG e adicione novos títulos ao catálogo.</p>
         </div>
       </div>
 

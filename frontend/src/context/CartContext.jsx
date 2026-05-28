@@ -41,8 +41,30 @@ export function CartProvider({ children }) {
   }, [loadCart, loadLibrary]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh, user?.id]);
+    let canceled = false;
+
+    async function syncCart() {
+      setLoading(true);
+      setLastError("");
+      try {
+        if (isLoggedIn) {
+          await api.mergeGuestCart();
+        }
+        if (!canceled) {
+          await Promise.all([loadCart(), loadLibrary()]);
+        }
+      } catch (error) {
+        if (!canceled) setLastError(error.message);
+      } finally {
+        if (!canceled) setLoading(false);
+      }
+    }
+
+    syncCart();
+    return () => {
+      canceled = true;
+    };
+  }, [isLoggedIn, user?.id, loadCart, loadLibrary]);
 
   const addToCart = useCallback(async (game) => {
     setLastError("");

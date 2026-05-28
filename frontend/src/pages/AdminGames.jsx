@@ -34,7 +34,7 @@ export default function AdminGames() {
     return (
       <section className="empty-state">
         <h1>Acesso restrito</h1>
-        <p className="muted">Somente administradores podem acessar o CRUD de jogos.</p>
+        <p className="muted">Somente administradores podem gerenciar o catálogo.</p>
       </section>
     );
   }
@@ -103,9 +103,9 @@ export default function AdminGames() {
     <section>
       <div className="page-title">
         <div>
-          <p className="eyebrow">Administração</p>
-          <h1>Jogos Admin</h1>
-          <p className="muted">Operações persistidas no PostgreSQL via Prisma.</p>
+          <p className="eyebrow">Painel da loja</p>
+          <h1>Gerenciar jogos</h1>
+          <p className="muted">Cadastre, edite e organize os jogos disponíveis na loja.</p>
         </div>
       </div>
 
@@ -127,7 +127,7 @@ export default function AdminGames() {
       {error && <p className="error">{error}</p>}
 
       <div className="table-card">
-        <h2>Jogos cadastrados</h2>
+        <h2>Catálogo atual</h2>
         {games.map((game) => (
           <div className="table-row" key={game.id}>
             <span>{game.title}</span>

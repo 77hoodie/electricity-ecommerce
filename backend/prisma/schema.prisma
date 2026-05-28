@@ -27,9 +27,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  orders       Order[]
-  libraryItems LibraryItem[]
-  cartItems    CartItem[]
+  orders        Order[]
+  libraryItems  LibraryItem[]
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
 }
 
 model Game {
@@ -47,9 +48,13 @@ model Game {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  cartItems    CartItem[]
-  libraryItems LibraryItem[]
-  orderItems   OrderItem[]
+  cartItems     CartItem[]
+  libraryItems  LibraryItem[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+  promotions    Promotion[]
+  genreLinks    GameGenre[]
+  platformLinks GamePlatform[]
 }
 
 model Genre {
@@ -57,11 +62,45 @@ model Genre {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  games     GameGenre[]
+}
+
+model Platform {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  games     GamePlatform[]
+}
+
+model GameGenre {
+  gameId  Int
+  genreId Int
+
+  game  Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, genreId])
+  @@index([genreId])
+}
+
+model GamePlatform {
+  gameId     Int
+  platformId Int
+
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, platformId])
+  @@index([platformId])
 }
 
 model CartItem {
   id            Int      @id @default(autoincrement())
   userId        Int?
+  sessionId     String?
   gameId        Int
   priceAtMoment Decimal  @db.Decimal(10, 2)
   createdAt     DateTime @default(now())
@@ -70,6 +109,8 @@ model CartItem {
   game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@unique([userId, gameId])
+  @@unique([sessionId, gameId])
+  @@index([sessionId])
 }
 
 model LibraryItem {
@@ -80,6 +121,18 @@ model LibraryItem {
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+}
+
+model WishlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  gameId    Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@unique([userId, gameId])
 }
@@ -103,4 +156,17 @@ model OrderItem {
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   game  Game  @relation(fields: [gameId], references: [id])
+}
+
+model Promotion {
+  id                 Int      @id @default(autoincrement())
+  gameId             Int
+  discountPercentage Int
+  startDate          DateTime
+  endDate            DateTime
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 }

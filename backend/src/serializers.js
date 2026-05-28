@@ -3,6 +3,15 @@ function toDateString(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+function listFromRelationsOrArray(record, relationKey, nestedKey, fallbackKey) {
+  if (Array.isArray(record?.[relationKey])) {
+    return record[relationKey]
+      .map((item) => item?.[nestedKey]?.name)
+      .filter(Boolean);
+  }
+  return record?.[fallbackKey] || [];
+}
+
 export function serializeUser(user) {
   if (!user) return null;
   return {
@@ -10,7 +19,8 @@ export function serializeUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
-    createdAt: user.createdAt?.toISOString?.() || user.createdAt
+    createdAt: user.createdAt?.toISOString?.() || user.createdAt,
+    updatedAt: user.updatedAt?.toISOString?.() || user.updatedAt
   };
 }
 
@@ -23,8 +33,8 @@ export function serializeGame(game) {
     price: Number(game.price),
     coverUrl: game.coverUrl,
     rating: game.rating,
-    genres: game.genres || [],
-    platforms: game.platforms || [],
+    genres: listFromRelationsOrArray(game, "genreLinks", "genre", "genres"),
+    platforms: listFromRelationsOrArray(game, "platformLinks", "platform", "platforms"),
     releaseDate: toDateString(game.releaseDate),
     isActive: game.isActive,
     createdAt: game.createdAt?.toISOString?.() || game.createdAt,
@@ -41,10 +51,21 @@ export function serializeGenre(genre) {
   };
 }
 
+export function serializePlatform(platform) {
+  return {
+    id: platform.id,
+    name: platform.name,
+    createdAt: platform.createdAt?.toISOString?.() || platform.createdAt,
+    updatedAt: platform.updatedAt?.toISOString?.() || platform.updatedAt
+  };
+}
+
 export function serializeCartItem(item) {
   const game = serializeGame(item.game);
   return {
     id: item.id,
+    userId: item.userId,
+    sessionId: item.sessionId,
     gameId: item.gameId,
     priceAtMoment: Number(item.priceAtMoment),
     title: game.title,
@@ -68,6 +89,15 @@ export function serializeLibraryItem(item) {
   };
 }
 
+export function serializeWishlistItem(item) {
+  return {
+    id: item.id,
+    userId: item.userId,
+    createdAt: item.createdAt?.toISOString?.() || item.createdAt,
+    ...serializeGame(item.game)
+  };
+}
+
 export function serializeOrder(order) {
   return {
     id: order.id,
@@ -82,5 +112,19 @@ export function serializeOrder(order) {
       priceAtPurchase: Number(item.priceAtPurchase),
       game: item.game ? serializeGame(item.game) : undefined
     })) || []
+  };
+}
+
+export function serializePromotion(promotion) {
+  return {
+    id: promotion.id,
+    gameId: promotion.gameId,
+    game: promotion.game ? serializeGame(promotion.game) : undefined,
+    discountPercentage: promotion.discountPercentage,
+    startDate: toDateString(promotion.startDate),
+    endDate: toDateString(promotion.endDate),
+    isActive: promotion.isActive,
+    createdAt: promotion.createdAt?.toISOString?.() || promotion.createdAt,
+    updatedAt: promotion.updatedAt?.toISOString?.() || promotion.updatedAt
   };
 }

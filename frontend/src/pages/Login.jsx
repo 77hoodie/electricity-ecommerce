@@ -51,7 +51,7 @@ export default function Login() {
         {error && <p className="error">{error}</p>}
 
         <div className="login-hints">
-          <strong>Contas de teste:</strong>
+          <strong>Acessos rápidos:</strong>
           <span>Usuário: user@electricity.com / user123</span>
           <span>Admin: admin@electricity.com / admin123</span>
         </div>
