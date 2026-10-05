@@ -62,7 +62,7 @@ function parseStringList(value) {
   return [...unique.values()];
 }
 
-async function syncGameGenres(gameId, names, db = prisma) {
+export async function syncGameGenres(gameId, names, db = prisma) {
   const genres = parseStringList(names);
   const records = [];
 

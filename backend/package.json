@@ -14,7 +14,8 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run tests/unit tests/integration --coverage",
-    "quality:report": "node scripts/static-analysis.js"
+    "quality:report": "node scripts/static-analysis.js",
+    "benchmark:genres": "node benchmarks/sync-game-genres.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
