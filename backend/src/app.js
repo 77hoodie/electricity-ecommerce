@@ -96,29 +96,35 @@ export async function syncGameGenres(gameId, names, db = prisma) {
   return genres;
 }
 
-async function syncGamePlatforms(gameId, names, db = prisma) {
+export async function syncGamePlatforms(gameId, names, db = prisma) {
   const platforms = parseStringList(names);
-  const records = [];
 
-  for (const name of platforms) {
-    const platform = await db.platform.upsert({
-      where: { name },
-      update: {},
-      create: { name }
-    });
-    records.push(platform);
-  }
-
-  const ids = records.map((platform) => platform.id);
-  if (ids.length === 0) {
+  if (platforms.length === 0) {
     await db.gamePlatform.deleteMany({ where: { gameId } });
-  } else {
-    await db.gamePlatform.deleteMany({ where: { gameId, platformId: { notIn: ids } } });
-    await db.gamePlatform.createMany({
-      data: ids.map((platformId) => ({ gameId, platformId })),
-      skipDuplicates: true
-    });
+    await db.game.update({ where: { id: gameId }, data: { platforms } });
+    return platforms;
   }
+
+  await db.platform.createMany({
+    data: platforms.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await db.platform.findMany({
+    where: { name: { in: platforms } },
+    select: { id: true, name: true }
+  });
+
+  const idsByName = new Map(records.map(({ name, id }) => [name, id]));
+  const ids = platforms.map((name) => idsByName.get(name));
+
+  await db.gamePlatform.deleteMany({
+    where: { gameId, platformId: { notIn: ids } }
+  });
+  await db.gamePlatform.createMany({
+    data: ids.map((platformId) => ({ gameId, platformId })),
+    skipDuplicates: true
+  });
 
   await db.game.update({ where: { id: gameId }, data: { platforms } });
   return platforms;
