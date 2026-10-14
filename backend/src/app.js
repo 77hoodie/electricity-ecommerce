@@ -64,27 +64,33 @@ function parseStringList(value) {
 
 export async function syncGameGenres(gameId, names, db = prisma) {
   const genres = parseStringList(names);
-  const records = [];
 
-  for (const name of genres) {
-    const genre = await db.genre.upsert({
-      where: { name },
-      update: {},
-      create: { name }
-    });
-    records.push(genre);
-  }
-
-  const ids = records.map((genre) => genre.id);
-  if (ids.length === 0) {
+  if (genres.length === 0) {
     await db.gameGenre.deleteMany({ where: { gameId } });
-  } else {
-    await db.gameGenre.deleteMany({ where: { gameId, genreId: { notIn: ids } } });
-    await db.gameGenre.createMany({
-      data: ids.map((genreId) => ({ gameId, genreId })),
-      skipDuplicates: true
-    });
+    await db.game.update({ where: { id: gameId }, data: { genres } });
+    return genres;
   }
+
+  await db.genre.createMany({
+    data: genres.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await db.genre.findMany({
+    where: { name: { in: genres } },
+    select: { id: true, name: true }
+  });
+
+  const idsByName = new Map(records.map(({ name, id }) => [name, id]));
+  const ids = genres.map((name) => idsByName.get(name));
+
+  await db.gameGenre.deleteMany({
+    where: { gameId, genreId: { notIn: ids } }
+  });
+  await db.gameGenre.createMany({
+    data: ids.map((genreId) => ({ gameId, genreId })),
+    skipDuplicates: true
+  });
 
   await db.game.update({ where: { id: gameId }, data: { genres } });
   return genres;
