@@ -1,0 +1,6 @@
+label,n,repetitions,medianMs,meanMs,minMs,maxMs,medianQueries
+after,10,5,2.26,4.08,1.97,11.37,
+after,50,5,2.03,2.1,2.02,2.36,
+after,100,5,2.29,2.58,1.83,4.34,
+after,500,5,5.63,11.96,5.23,34.41,
+after,1000,5,7.3,7.89,7.07,9.43,
