@@ -851,40 +851,62 @@ app.delete("/api/cart", async (req, res, next) => {
   }
 });
 
-app.post("/api/cart/merge-guest", requireAuth, async (req, res, next) => {
-  try {
-    const sessionId = getGuestCartId(req);
-    const guestItems = await prisma.cartItem.findMany({
-      where: { sessionId },
-      include: { game: true }
-    });
+export async function mergeGuestCart(userId, sessionId, db = prisma) {
+  const guestItems = await db.cartItem.findMany({
+    where: { sessionId },
+    include: { game: true }
+  });
 
-    let merged = 0;
-    let skipped = 0;
+  if (guestItems.length === 0) {
+    await db.cartItem.deleteMany({ where: { sessionId } });
+    return { merged: 0, skipped: 0 };
+  }
 
-    for (const item of guestItems) {
-      const [existingCartItem, existingLibraryItem] = await Promise.all([
-        prisma.cartItem.findUnique({ where: { userId_gameId: { userId: req.user.id, gameId: item.gameId } } }),
-        prisma.libraryItem.findFirst({ where: { userId: req.user.id, gameId: item.gameId } })
-      ]);
+  const gameIds = guestItems.map((item) => item.gameId);
+  const [existingCartItems, existingLibraryItems] = await Promise.all([
+    db.cartItem.findMany({
+      where: { userId, gameId: { in: gameIds } },
+      select: { gameId: true }
+    }),
+    db.libraryItem.findMany({
+      where: { userId, gameId: { in: gameIds } },
+      select: { gameId: true }
+    })
+  ]);
 
-      if (existingCartItem || existingLibraryItem || !item.game?.isActive) {
-        skipped += 1;
-        continue;
-      }
+  const cartGameIds = new Set(existingCartItems.map((item) => item.gameId));
+  const libraryGameIds = new Set(existingLibraryItems.map((item) => item.gameId));
+  const eligibleItems = [];
 
-      await prisma.cartItem.create({
-        data: {
-          userId: req.user.id,
-          sessionId: null,
-          gameId: item.gameId,
-          priceAtMoment: item.priceAtMoment
-        }
-      });
-      merged += 1;
+  for (const item of guestItems) {
+    if (cartGameIds.has(item.gameId) || libraryGameIds.has(item.gameId) || !item.game?.isActive) {
+      continue;
     }
 
-    await prisma.cartItem.deleteMany({ where: { sessionId } });
+    eligibleItems.push({
+      userId,
+      sessionId: null,
+      gameId: item.gameId,
+      priceAtMoment: item.priceAtMoment
+    });
+  }
+
+  let merged = 0;
+  if (eligibleItems.length > 0) {
+    const result = await db.cartItem.createMany({
+      data: eligibleItems,
+      skipDuplicates: true
+    });
+    merged = result.count;
+  }
+
+  await db.cartItem.deleteMany({ where: { sessionId } });
+  return { merged, skipped: guestItems.length - merged };
+}
+
+app.post("/api/cart/merge-guest", requireAuth, async (req, res, next) => {
+  try {
+    const { merged, skipped } = await mergeGuestCart(req.user.id, getGuestCartId(req));
     const payload = await getCartPayload({ user: req.user, userId: req.user.id, sessionId: null });
     res.json({ merged, skipped, ...payload });
   } catch (error) {
