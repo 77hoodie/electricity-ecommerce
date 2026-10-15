@@ -874,13 +874,17 @@ app.post("/api/orders/checkout", requireAuth, async (req, res, next) => {
         include: { user: true, items: { include: { game: { include: GAME_INCLUDE } } } }
       });
 
-      for (const item of cartItems) {
-        await tx.libraryItem.upsert({
-          where: { userId_gameId: { userId: req.user.id, gameId: item.gameId } },
-          update: {},
-          create: { userId: req.user.id, gameId: item.gameId }
-        });
-      }
+      const libraryData = cartItems.map((item) => ({
+  userId: req.user.id,
+  gameId: item.gameId
+}));
+
+if (libraryData.length > 0) {
+  await tx.libraryItem.createMany({
+    data: libraryData,
+    skipDuplicates: true
+  });
+}
 
       await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
       return createdOrder;
@@ -935,7 +939,7 @@ app.patch("/api/orders/:id/status", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Wishlist
+
 app.get("/api/wishlist", requireAuth, async (req, res, next) => {
   try {
     const items = await prisma.wishlistItem.findMany({
