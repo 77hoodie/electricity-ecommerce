@@ -18,7 +18,8 @@
     "benchmark:genres": "node benchmarks/sync-game-genres.js",
     "benchmark:remove-name": "node benchmarks/remove-name-from-game-array.js",
     "benchmark:platforms": "node benchmarks/sync-game-platforms.js",
-    "benchmark:replace-name": "node benchmarks/replace-name-in-game-array.js"
+    "benchmark:replace-name": "node benchmarks/replace-name-in-game-array.js",
+    "benchmark:checkout": "node benchmarks/checkout-biblioteca.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
