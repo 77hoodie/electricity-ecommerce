@@ -3,6 +3,7 @@ import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { HttpError } from "./errors.js";
 import { assertCanAddToCart, calculateCartTotal } from "./cartRules.js";
@@ -150,12 +151,21 @@ async function replaceNameInGameArray(field, oldName, newName, db = prisma) {
   }
 }
 
-async function removeNameFromGameArray(field, name, db = prisma) {
-  const games = await db.game.findMany({ where: { [field]: { has: name } } });
-  for (const game of games) {
-    const values = (game[field] || []).filter((value) => value !== name);
-    await db.game.update({ where: { id: game.id }, data: { [field]: values } });
-  }
+const GAME_ARRAY_COLUMNS = new Map([
+  ["genres", Prisma.sql`"genres"`],
+  ["platforms", Prisma.sql`"platforms"`]
+]);
+
+export async function removeNameFromGameArray(field, name, db = prisma) {
+  const column = GAME_ARRAY_COLUMNS.get(field);
+  if (!column) throw new Error(`Campo inválido: ${field}`);
+
+  await db.$executeRaw`
+    UPDATE "Game"
+    SET ${column} = array_remove(${column}, ${name}::text),
+        "updatedAt" = (now() AT TIME ZONE 'UTC')
+    WHERE ${column} @> ARRAY[${name}::text]
+  `;
 }
 
 let legacyTaxonomySynced = false;
