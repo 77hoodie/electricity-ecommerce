@@ -12,11 +12,11 @@
     "db:seed": "prisma db seed",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run tests/integration --no-file-parallelism --testTimeout=15000 --hookTimeout=15000",
     "test:coverage": "vitest run tests/unit tests/integration --coverage",
     "quality:report": "node scripts/static-analysis.js",
     "benchmark:genres": "node benchmarks/sync-game-genres.js",
-    "benchmark:remove-name": "node benchmarks/results/remove-name-from-game-array.js",
+    "benchmark:remove-name": "node benchmarks/remove-name-from-game-array.js",
     "benchmark:platforms": "node benchmarks/sync-game-platforms.js"
   },
   "prisma": {
