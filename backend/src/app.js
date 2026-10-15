@@ -143,12 +143,32 @@ async function findGameForResponse(id, db = prisma) {
   });
 }
 
-async function replaceNameInGameArray(field, oldName, newName, db = prisma) {
-  const games = await db.game.findMany({ where: { [field]: { has: oldName } } });
-  for (const game of games) {
-    const values = parseStringList((game[field] || []).map((value) => value === oldName ? newName : value));
-    await db.game.update({ where: { id: game.id }, data: { [field]: values } });
-  }
+export async function replaceNameInGameArray(field, oldName, newName, db = prisma) {
+  const column = GAME_ARRAY_COLUMNS.get(field);
+  if (!column) throw new Error(`Campo inválido: ${field}`);
+
+  const games = await db.game.findMany({
+    where: { [field]: { has: oldName } },
+    select: { id: true, [field]: true }
+  });
+
+  if (games.length === 0) return;
+
+  const updates = games.map((game) => ({
+    id: game.id,
+    values: parseStringList((game[field] || []).map((value) =>
+      value === oldName ? newName : value
+    ))
+  }));
+
+  await db.$executeRaw`
+    UPDATE "Game" AS target
+    SET ${column} = incoming."values",
+        "updatedAt" = (now() AT TIME ZONE 'UTC')
+    FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb)
+      AS incoming("id" integer, "values" text[])
+    WHERE target."id" = incoming."id"
+  `;
 }
 
 const GAME_ARRAY_COLUMNS = new Map([
