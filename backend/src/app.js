@@ -188,27 +188,201 @@ export async function removeNameFromGameArray(field, name, db = prisma) {
   `;
 }
 
-export async function syncAllGamesTaxonomy(db = prisma) {
-  const games = await db.game.findMany({
-    select: { id: true, genres: true, platforms: true }
-  });
-
-  for (const game of games) {
-    await syncGameTaxonomy(game.id, {
-      genres: game.genres || [],
-      platforms: game.platforms || []
-    }, db);
-  }
-}
-
 let legacyTaxonomySynced = false;
 
-async function ensureLegacyTaxonomySynced() {
+export async function ensureLegacyTaxonomySynced() {
   if (legacyTaxonomySynced) return;
-
-  await syncAllGamesTaxonomy();
-
+  await syncAllGamesTaxonomy(prisma);
   legacyTaxonomySynced = true;
+}
+
+function normalizeList(list) {
+  if (!list || !Array.isArray(list)) return [];
+  const map = new Map();
+  for (const item of list) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed.length > 0) {
+        map.set(trimmed.toLowerCase(), trimmed);
+      }
+    }
+  }
+  return Array.from(map.values());
+}
+
+function areArraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+export async function syncAllGamesTaxonomy(db = prisma) {
+  const games = await db.game.findMany();
+  if (!games || games.length === 0) return;
+
+  const normalizedGames = [];
+  const genreNameMap = new Map();
+  const platformNameMap = new Map();
+
+  for (const game of games) {
+    const genres = normalizeList(game.genres);
+    const platforms = normalizeList(game.platforms);
+
+    const genresChanged = !areArraysEqual(genres, game.genres);
+    const platformsChanged = !areArraysEqual(platforms, game.platforms);
+
+    if (genresChanged || platformsChanged) {
+      try {
+        await db.game.update({
+          where: { id: game.id },
+          data: { genres, platforms }
+        });
+      } catch (err) {
+        if (err?.code === "P2025") {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    for (const g of genres) {
+      genreNameMap.set(g.toLowerCase(), g);
+    }
+    for (const p of platforms) {
+      platformNameMap.set(p.toLowerCase(), p);
+    }
+
+    normalizedGames.push({
+      ...game,
+      genres,
+      platforms
+    });
+  }
+
+  const genreNames = Array.from(genreNameMap.values());
+  const platformNames = Array.from(platformNameMap.values());
+
+  const existingGenres = genreNames.length > 0
+    ? await db.genre.findMany({ where: { name: { in: genreNames } } })
+    : [];
+
+  const genreIdMap = new Map();
+  for (const g of existingGenres) {
+    genreIdMap.set(g.name.toLowerCase(), g.id);
+  }
+
+  const missingGenreNames = genreNames.filter(
+    (name) => !genreIdMap.has(name.toLowerCase())
+  );
+
+  if (missingGenreNames.length > 0) {
+    await db.genre.createMany({
+      data: missingGenreNames.map((name) => ({ name })),
+      skipDuplicates: true
+    });
+    const newGenres = await db.genre.findMany({
+      where: { name: { in: missingGenreNames } }
+    });
+    for (const g of newGenres) {
+      genreIdMap.set(g.name.toLowerCase(), g.id);
+    }
+  }
+
+  const existingPlatforms = platformNames.length > 0
+    ? await db.platform.findMany({ where: { name: { in: platformNames } } })
+    : [];
+
+  const platformIdMap = new Map();
+  for (const p of existingPlatforms) {
+    platformIdMap.set(p.name.toLowerCase(), p.id);
+  }
+
+  const missingPlatformNames = platformNames.filter(
+    (name) => !platformIdMap.has(name.toLowerCase())
+  );
+
+  if (missingPlatformNames.length > 0) {
+    await db.platform.createMany({
+      data: missingPlatformNames.map((name) => ({ name })),
+      skipDuplicates: true
+    });
+    const newPlatforms = await db.platform.findMany({
+      where: { name: { in: missingPlatformNames } }
+    });
+    for (const p of newPlatforms) {
+      platformIdMap.set(p.name.toLowerCase(), p.id);
+    }
+  }
+
+  const allGameGenres = [];
+  const allGamePlatforms = [];
+
+  for (const game of normalizedGames) {
+    const validGenreIds = game.genres
+      .map((g) => genreIdMap.get(g.toLowerCase()))
+      .filter(Boolean);
+
+    const validPlatformIds = game.platforms
+      .map((p) => platformIdMap.get(p.toLowerCase()))
+      .filter(Boolean);
+
+    try {
+      await db.gameGenre.deleteMany({
+        where: { gameId: game.id, genreId: { notIn: validGenreIds } }
+      });
+    } catch (err) {
+      if (err?.code !== "P2025" && err?.code !== "P2003") {
+        throw err;
+      }
+    }
+
+    try {
+      await db.gamePlatform.deleteMany({
+        where: { gameId: game.id, platformId: { notIn: validPlatformIds } }
+      });
+    } catch (err) {
+      if (err?.code !== "P2025" && err?.code !== "P2003") {
+        throw err;
+      }
+    }
+
+    for (const genreId of validGenreIds) {
+      allGameGenres.push({ gameId: game.id, genreId });
+    }
+
+    for (const platformId of validPlatformIds) {
+      allGamePlatforms.push({ gameId: game.id, platformId });
+    }
+  }
+
+  if (allGameGenres.length > 0) {
+    try {
+      await db.gameGenre.createMany({
+        data: allGameGenres,
+        skipDuplicates: true
+      });
+    } catch (err) {
+      if (err?.code !== "P2025" && err?.code !== "P2003") {
+        throw err;
+      }
+    }
+  }
+
+  if (allGamePlatforms.length > 0) {
+    try {
+      await db.gamePlatform.createMany({
+        data: allGamePlatforms,
+        skipDuplicates: true
+      });
+    } catch (err) {
+      if (err?.code !== "P2025" && err?.code !== "P2003") {
+        throw err;
+      }
+    }
+  }
 }
 
 function getGuestCartId(req) {
@@ -943,16 +1117,16 @@ app.post("/api/orders/checkout", requireAuth, async (req, res, next) => {
       });
 
       const libraryData = cartItems.map((item) => ({
-  userId: req.user.id,
-  gameId: item.gameId
-}));
+        userId: req.user.id,
+        gameId: item.gameId
+      }));
 
-if (libraryData.length > 0) {
-  await tx.libraryItem.createMany({
-    data: libraryData,
-    skipDuplicates: true
-  });
-}
+      if (libraryData.length > 0) {
+        await tx.libraryItem.createMany({
+          data: libraryData,
+          skipDuplicates: true
+        });
+      }
 
       await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
       return createdOrder;
