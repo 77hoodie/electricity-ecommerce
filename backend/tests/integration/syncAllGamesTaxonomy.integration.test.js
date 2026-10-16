@@ -103,6 +103,62 @@ maybeDescribe("syncAllGamesTaxonomy com PostgreSQL", () => {
     }
   });
 
+  it("preserva relacionamentos que diferem somente na capitalização", async () => {
+    const { syncAllGamesTaxonomy } = await import("../../src/app.js");
+    const { prisma } = await import("../../src/prisma.js");
+    const prefix = `Teste-${randomUUID()}`;
+    const upperGenre = `${prefix}-RPG`;
+    const lowerGenre = `${prefix}-rpg`;
+    const upperPlatform = `${prefix}-PC`;
+    const lowerPlatform = `${prefix}-pc`;
+    const games = [];
+
+    try {
+      games.push(await createLegacyGame(prisma, prefix, "Maiusculo", [upperGenre], [upperPlatform]));
+      games.push(await createLegacyGame(prisma, prefix, "Minusculo", [lowerGenre], [lowerPlatform]));
+
+      await syncAllGamesTaxonomy();
+
+      const synced = await prisma.game.findMany({
+        where: { id: { in: games.map((game) => game.id) } },
+        include: {
+          genreLinks: { include: { genre: true } },
+          platformLinks: { include: { platform: true } }
+        },
+        orderBy: { id: "asc" }
+      });
+
+      expect(synced[0].genreLinks.map(({ genre }) => genre.name)).toEqual([upperGenre]);
+      expect(synced[1].genreLinks.map(({ genre }) => genre.name)).toEqual([lowerGenre]);
+      expect(synced[0].platformLinks.map(({ platform }) => platform.name)).toEqual([upperPlatform]);
+      expect(synced[1].platformLinks.map(({ platform }) => platform.name)).toEqual([lowerPlatform]);
+      expect(synced[0].genres).toEqual([upperGenre]);
+      expect(synced[1].genres).toEqual([lowerGenre]);
+    } finally {
+      await cleanup(prisma, games, prefix);
+    }
+  });
+
+  it("atualiza updatedAt quando os arrays já estão normalizados", async () => {
+    const { syncAllGamesTaxonomy } = await import("../../src/app.js");
+    const { prisma } = await import("../../src/prisma.js");
+    const prefix = `Teste-${randomUUID()}`;
+    const games = [];
+
+    try {
+      games.push(await createLegacyGame(prisma, prefix, "Timestamp", [`${prefix}-Ação`], []));
+      const before = await prisma.game.findUnique({ where: { id: games[0].id } });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      await syncAllGamesTaxonomy();
+
+      const after = await prisma.game.findUnique({ where: { id: games[0].id } });
+      expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
+    } finally {
+      await cleanup(prisma, games, prefix);
+    }
+  });
+
   it("é idempotente ao ser executada duas vezes", async () => {
     const { syncAllGamesTaxonomy } = await import("../../src/app.js");
     const { prisma } = await import("../../src/prisma.js");

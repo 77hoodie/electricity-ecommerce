@@ -210,15 +210,6 @@ function normalizeList(list) {
   return Array.from(map.values());
 }
 
-function areArraysEqual(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
 export async function syncAllGamesTaxonomy(db = prisma) {
   const games = await db.game.findMany();
   if (!games || games.length === 0) return;
@@ -231,28 +222,16 @@ export async function syncAllGamesTaxonomy(db = prisma) {
     const genres = normalizeList(game.genres);
     const platforms = normalizeList(game.platforms);
 
-    const genresChanged = !areArraysEqual(genres, game.genres);
-    const platformsChanged = !areArraysEqual(platforms, game.platforms);
-
-    if (genresChanged || platformsChanged) {
-      try {
-        await db.game.update({
-          where: { id: game.id },
-          data: { genres, platforms }
-        });
-      } catch (err) {
-        if (err?.code === "P2025") {
-          continue;
-        }
-        throw err;
-      }
-    }
+    await db.game.update({
+      where: { id: game.id },
+      data: { genres, platforms }
+    });
 
     for (const g of genres) {
-      genreNameMap.set(g.toLowerCase(), g);
+      genreNameMap.set(g, g);
     }
     for (const p of platforms) {
-      platformNameMap.set(p.toLowerCase(), p);
+      platformNameMap.set(p, p);
     }
 
     normalizedGames.push({
@@ -271,11 +250,11 @@ export async function syncAllGamesTaxonomy(db = prisma) {
 
   const genreIdMap = new Map();
   for (const g of existingGenres) {
-    genreIdMap.set(g.name.toLowerCase(), g.id);
+    genreIdMap.set(g.name, g.id);
   }
 
   const missingGenreNames = genreNames.filter(
-    (name) => !genreIdMap.has(name.toLowerCase())
+    (name) => !genreIdMap.has(name)
   );
 
   if (missingGenreNames.length > 0) {
@@ -287,7 +266,7 @@ export async function syncAllGamesTaxonomy(db = prisma) {
       where: { name: { in: missingGenreNames } }
     });
     for (const g of newGenres) {
-      genreIdMap.set(g.name.toLowerCase(), g.id);
+      genreIdMap.set(g.name, g.id);
     }
   }
 
@@ -297,11 +276,11 @@ export async function syncAllGamesTaxonomy(db = prisma) {
 
   const platformIdMap = new Map();
   for (const p of existingPlatforms) {
-    platformIdMap.set(p.name.toLowerCase(), p.id);
+    platformIdMap.set(p.name, p.id);
   }
 
   const missingPlatformNames = platformNames.filter(
-    (name) => !platformIdMap.has(name.toLowerCase())
+    (name) => !platformIdMap.has(name)
   );
 
   if (missingPlatformNames.length > 0) {
@@ -313,7 +292,7 @@ export async function syncAllGamesTaxonomy(db = prisma) {
       where: { name: { in: missingPlatformNames } }
     });
     for (const p of newPlatforms) {
-      platformIdMap.set(p.name.toLowerCase(), p.id);
+      platformIdMap.set(p.name, p.id);
     }
   }
 
@@ -322,32 +301,20 @@ export async function syncAllGamesTaxonomy(db = prisma) {
 
   for (const game of normalizedGames) {
     const validGenreIds = game.genres
-      .map((g) => genreIdMap.get(g.toLowerCase()))
+      .map((g) => genreIdMap.get(g))
       .filter(Boolean);
 
     const validPlatformIds = game.platforms
-      .map((p) => platformIdMap.get(p.toLowerCase()))
+      .map((p) => platformIdMap.get(p))
       .filter(Boolean);
 
-    try {
-      await db.gameGenre.deleteMany({
-        where: { gameId: game.id, genreId: { notIn: validGenreIds } }
-      });
-    } catch (err) {
-      if (err?.code !== "P2025" && err?.code !== "P2003") {
-        throw err;
-      }
-    }
+    await db.gameGenre.deleteMany({
+      where: { gameId: game.id, genreId: { notIn: validGenreIds } }
+    });
 
-    try {
-      await db.gamePlatform.deleteMany({
-        where: { gameId: game.id, platformId: { notIn: validPlatformIds } }
-      });
-    } catch (err) {
-      if (err?.code !== "P2025" && err?.code !== "P2003") {
-        throw err;
-      }
-    }
+    await db.gamePlatform.deleteMany({
+      where: { gameId: game.id, platformId: { notIn: validPlatformIds } }
+    });
 
     for (const genreId of validGenreIds) {
       allGameGenres.push({ gameId: game.id, genreId });
@@ -359,29 +326,17 @@ export async function syncAllGamesTaxonomy(db = prisma) {
   }
 
   if (allGameGenres.length > 0) {
-    try {
-      await db.gameGenre.createMany({
-        data: allGameGenres,
-        skipDuplicates: true
-      });
-    } catch (err) {
-      if (err?.code !== "P2025" && err?.code !== "P2003") {
-        throw err;
-      }
-    }
+    await db.gameGenre.createMany({
+      data: allGameGenres,
+      skipDuplicates: true
+    });
   }
 
   if (allGamePlatforms.length > 0) {
-    try {
-      await db.gamePlatform.createMany({
-        data: allGamePlatforms,
-        skipDuplicates: true
-      });
-    } catch (err) {
-      if (err?.code !== "P2025" && err?.code !== "P2003") {
-        throw err;
-      }
-    }
+    await db.gamePlatform.createMany({
+      data: allGamePlatforms,
+      skipDuplicates: true
+    });
   }
 }
 

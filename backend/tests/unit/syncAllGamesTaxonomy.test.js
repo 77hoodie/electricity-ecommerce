@@ -229,4 +229,62 @@ describe("syncAllGamesTaxonomy", () => {
 
     expect(snapshot(db)).toBe(first);
   });
+  it("preserva nomes que diferem apenas por maiúsculas entre jogos", async () => {
+    const db = createDb([
+      { id: 1, genres: ["RPG"], platforms: ["PC"] },
+      { id: 2, genres: ["rpg"], platforms: ["pc"] }
+    ]);
+
+    await syncAllGamesTaxonomy(db);
+
+    expect(db.genre.rows.map((row) => row.name).sort()).toEqual(["RPG", "rpg"]);
+    expect(db.platform.rows.map((row) => row.name).sort()).toEqual(["PC", "pc"]);
+    expect(genresOf(db, 1)).toEqual(["RPG"]);
+    expect(genresOf(db, 2)).toEqual(["rpg"]);
+    expect(platformsOf(db, 1)).toEqual(["PC"]);
+    expect(platformsOf(db, 2)).toEqual(["pc"]);
+  });
+
+  it("atualiza o jogo mesmo quando os arrays já estão normalizados", async () => {
+    const db = createDb([
+      { id: 1, genres: ["Ação"], platforms: ["PC"] }
+    ]);
+    let updates = 0;
+    const originalUpdate = db.game.update;
+    db.game.update = async (args) => {
+      updates += 1;
+      return originalUpdate(args);
+    };
+
+    await syncAllGamesTaxonomy(db);
+    await syncAllGamesTaxonomy(db);
+
+    expect(updates).toBe(2);
+  });
+
+  it("propaga erros de integridade referencial sem ocultá-los", async () => {
+    const db = createDb([
+      { id: 1, genres: ["Ação"], platforms: [] }
+    ]);
+    db.gameGenre.createMany = async () => {
+      const error = new Error("Falha de integridade referencial");
+      error.code = "P2003";
+      throw error;
+    };
+
+    await expect(syncAllGamesTaxonomy(db)).rejects.toMatchObject({ code: "P2003" });
+  });
+
+  it("propaga falhas ao atualizar um jogo que deixou de existir", async () => {
+    const db = createDb([
+      { id: 1, genres: ["Ação"], platforms: [] }
+    ]);
+    db.game.update = async () => {
+      const error = new Error("Registro ausente");
+      error.code = "P2025";
+      throw error;
+    };
+
+    await expect(syncAllGamesTaxonomy(db)).rejects.toMatchObject({ code: "P2025" });
+  });
 });
