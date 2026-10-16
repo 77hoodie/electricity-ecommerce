@@ -196,148 +196,94 @@ export async function ensureLegacyTaxonomySynced() {
   legacyTaxonomySynced = true;
 }
 
-function normalizeList(list) {
-  if (!list || !Array.isArray(list)) return [];
-  const map = new Map();
-  for (const item of list) {
-    if (typeof item === "string") {
-      const trimmed = item.trim();
-      if (trimmed.length > 0) {
-        map.set(trimmed.toLowerCase(), trimmed);
-      }
-    }
+const TAXONOMY_FIELDS = new Map([
+  ["genres", {
+    catalog: "genre",
+    link: "gameGenre",
+    foreignKey: "genreId",
+    table: Prisma.sql`"GameGenre"`,
+    column: Prisma.sql`"genreId"`
+  }],
+  ["platforms", {
+    catalog: "platform",
+    link: "gamePlatform",
+    foreignKey: "platformId",
+    table: Prisma.sql`"GamePlatform"`,
+    column: Prisma.sql`"platformId"`
+  }]
+]);
+
+async function resolveCatalogIds(model, names) {
+  const unique = [...new Set(names)];
+  if (unique.length === 0) return new Map();
+
+  await model.createMany({
+    data: unique.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await model.findMany({
+    where: { name: { in: unique } },
+    select: { id: true, name: true }
+  });
+
+  return new Map(records.map(({ name, id }) => [name, id]));
+}
+
+async function syncTaxonomyLinks(db, games, field) {
+  const { catalog, link, foreignKey, table, column } = TAXONOMY_FIELDS.get(field);
+  const idsByName = await resolveCatalogIds(
+    db[catalog],
+    games.flatMap((game) => game[field])
+  );
+
+  const desired = games.map((game) => ({
+    id: game.id,
+    ids: game[field].map((name) => idsByName.get(name))
+  }));
+
+  await db.$executeRaw`
+    DELETE FROM ${table} AS link
+    USING jsonb_to_recordset(${JSON.stringify(desired)}::jsonb)
+      AS scope("id" integer, "ids" integer[])
+    WHERE link."gameId" = scope."id"
+      AND NOT (link.${column} = ANY(scope."ids"))
+  `;
+
+  const data = desired.flatMap((entry) =>
+    entry.ids.map((id) => ({ gameId: entry.id, [foreignKey]: id }))
+  );
+
+  if (data.length > 0) {
+    await db[link].createMany({ data, skipDuplicates: true });
   }
-  return Array.from(map.values());
 }
 
 export async function syncAllGamesTaxonomy(db = prisma) {
-  const games = await db.game.findMany();
-  if (!games || games.length === 0) return;
+  const games = await db.game.findMany({
+    select: { id: true, genres: true, platforms: true }
+  });
 
-  const normalizedGames = [];
-  const genreNameMap = new Map();
-  const platformNameMap = new Map();
+  if (games.length === 0) return;
 
-  for (const game of games) {
-    const genres = normalizeList(game.genres);
-    const platforms = normalizeList(game.platforms);
+  const normalized = games.map((game) => ({
+    id: game.id,
+    genres: parseStringList(game.genres || []),
+    platforms: parseStringList(game.platforms || [])
+  }));
 
-    await db.game.update({
-      where: { id: game.id },
-      data: { genres, platforms }
-    });
+  await syncTaxonomyLinks(db, normalized, "genres");
+  await syncTaxonomyLinks(db, normalized, "platforms");
 
-    for (const g of genres) {
-      genreNameMap.set(g, g);
-    }
-    for (const p of platforms) {
-      platformNameMap.set(p, p);
-    }
-
-    normalizedGames.push({
-      ...game,
-      genres,
-      platforms
-    });
-  }
-
-  const genreNames = Array.from(genreNameMap.values());
-  const platformNames = Array.from(platformNameMap.values());
-
-  const existingGenres = genreNames.length > 0
-    ? await db.genre.findMany({ where: { name: { in: genreNames } } })
-    : [];
-
-  const genreIdMap = new Map();
-  for (const g of existingGenres) {
-    genreIdMap.set(g.name, g.id);
-  }
-
-  const missingGenreNames = genreNames.filter(
-    (name) => !genreIdMap.has(name)
-  );
-
-  if (missingGenreNames.length > 0) {
-    await db.genre.createMany({
-      data: missingGenreNames.map((name) => ({ name })),
-      skipDuplicates: true
-    });
-    const newGenres = await db.genre.findMany({
-      where: { name: { in: missingGenreNames } }
-    });
-    for (const g of newGenres) {
-      genreIdMap.set(g.name, g.id);
-    }
-  }
-
-  const existingPlatforms = platformNames.length > 0
-    ? await db.platform.findMany({ where: { name: { in: platformNames } } })
-    : [];
-
-  const platformIdMap = new Map();
-  for (const p of existingPlatforms) {
-    platformIdMap.set(p.name, p.id);
-  }
-
-  const missingPlatformNames = platformNames.filter(
-    (name) => !platformIdMap.has(name)
-  );
-
-  if (missingPlatformNames.length > 0) {
-    await db.platform.createMany({
-      data: missingPlatformNames.map((name) => ({ name })),
-      skipDuplicates: true
-    });
-    const newPlatforms = await db.platform.findMany({
-      where: { name: { in: missingPlatformNames } }
-    });
-    for (const p of newPlatforms) {
-      platformIdMap.set(p.name, p.id);
-    }
-  }
-
-  const allGameGenres = [];
-  const allGamePlatforms = [];
-
-  for (const game of normalizedGames) {
-    const validGenreIds = game.genres
-      .map((g) => genreIdMap.get(g))
-      .filter(Boolean);
-
-    const validPlatformIds = game.platforms
-      .map((p) => platformIdMap.get(p))
-      .filter(Boolean);
-
-    await db.gameGenre.deleteMany({
-      where: { gameId: game.id, genreId: { notIn: validGenreIds } }
-    });
-
-    await db.gamePlatform.deleteMany({
-      where: { gameId: game.id, platformId: { notIn: validPlatformIds } }
-    });
-
-    for (const genreId of validGenreIds) {
-      allGameGenres.push({ gameId: game.id, genreId });
-    }
-
-    for (const platformId of validPlatformIds) {
-      allGamePlatforms.push({ gameId: game.id, platformId });
-    }
-  }
-
-  if (allGameGenres.length > 0) {
-    await db.gameGenre.createMany({
-      data: allGameGenres,
-      skipDuplicates: true
-    });
-  }
-
-  if (allGamePlatforms.length > 0) {
-    await db.gamePlatform.createMany({
-      data: allGamePlatforms,
-      skipDuplicates: true
-    });
-  }
+  await db.$executeRaw`
+    UPDATE "Game" AS target
+    SET "genres" = incoming."genres",
+        "platforms" = incoming."platforms",
+        "updatedAt" = (now() AT TIME ZONE 'UTC')
+    FROM jsonb_to_recordset(${JSON.stringify(normalized)}::jsonb)
+      AS incoming("id" integer, "genres" text[], "platforms" text[])
+    WHERE target."id" = incoming."id"
+  `;
 }
 
 function getGuestCartId(req) {
