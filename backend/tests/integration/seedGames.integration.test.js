@@ -345,6 +345,50 @@ maybeDescribe("seedGames com PostgreSQL", () => {
     }
   });
 
+  it("preserva os campos da primeira ocorrência com títulos repetidos em lotes diferentes", async () => {
+    const { seedGames, prisma } = await loadContext();
+    const { randomInt } = await import("node:crypto");
+    const prefix = `Teste-${randomUUID()}`;
+    const firstRawgId = randomInt(1_000_000_000, 1_500_000_000);
+    const secondRawgId = randomInt(1_500_000_000, 2_000_000_000);
+    const firstGenre = `${prefix}-Primeiro`;
+    const lastGenre = `${prefix}-Ultimo`;
+    const input = Array.from({ length: 35 }, (_, index) =>
+      buildGame(prefix, `Jogo-${index}`, { genres: [`${prefix}-G-${index}`] })
+    );
+
+    input[0] = buildGame(prefix, "Repetido", {
+      rawgId: firstRawgId,
+      isActive: false,
+      description: "primeira versão",
+      genres: [firstGenre]
+    });
+    input[34] = buildGame(prefix, "Repetido", {
+      rawgId: secondRawgId,
+      isActive: false,
+      description: "última versão",
+      genres: [lastGenre]
+    });
+
+    try {
+      await seedGames(input, prisma);
+
+      const rows = await prisma.game.findMany({
+        where: { title: `${prefix}-Repetido` },
+        include: { genreLinks: { include: { genre: true } } }
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].rawgId).toBe(firstRawgId);
+      expect(rows[0].isActive).toBe(true);
+      expect(rows[0].description).toBe("última versão");
+      expect(rows[0].genres).toEqual([lastGenre]);
+      expect(linkNames(rows[0].genreLinks, "genre")).toEqual([lastGenre]);
+      expect(await catalogNames(prisma, "genre", prefix)).toContain(firstGenre);
+    } finally {
+      await cleanup(prisma, prefix);
+    }
+  });
+
   it("é idempotente ao ser executada duas vezes", async () => {
     const { seedGames, prisma } = await loadContext();
     const prefix = `Teste-${randomUUID()}`;

@@ -75,7 +75,9 @@ async function syncTaxonomyLinks(db, field, entries, catalogNames) {
   }
 }
 
-export async function seedGames(games, db) {
+const MAX_GAMES_PER_BATCH = 32;
+
+async function seedGamesBatch(games, db) {
   if (games.length === 0) return;
 
   const prepared = games.map((game) => ({
@@ -84,8 +86,16 @@ export async function seedGames(games, db) {
     platforms: parseStringList(game.platforms || [])
   }));
 
+  const firstByTitle = new Map();
   const latestByTitle = new Map();
-  for (const entry of prepared) latestByTitle.set(entry.game.title, entry);
+  const repeatedTitles = new Set();
+
+  for (const entry of prepared) {
+    const title = entry.game.title;
+    if (firstByTitle.has(title)) repeatedTitles.add(title);
+    else firstByTitle.set(title, entry);
+    latestByTitle.set(title, entry);
+  }
   const entries = [...latestByTitle.values()];
 
   const existingRows = await db.game.findMany({
@@ -105,7 +115,25 @@ export async function seedGames(games, db) {
 
   if (toCreate.length > 0) {
     const created = await db.game.createManyAndReturn({
-      data: toCreate.map(({ game, genres, platforms }) => ({ ...game, genres, platforms })),
+      data: toCreate.map(({ game, genres, platforms }) => {
+        if (!repeatedTitles.has(game.title)) {
+          return { ...game, genres, platforms };
+        }
+
+        const first = firstByTitle.get(game.title).game;
+        return {
+          ...first,
+          description: game.description,
+          price: game.price,
+          coverUrl: game.coverUrl,
+          rating: game.rating,
+          genres,
+          platforms,
+          releaseDate: game.releaseDate,
+          isActive: true,
+          updatedAt: new Date()
+        };
+      }),
       select: { id: true, title: true }
     });
     for (const row of created) savedIds.set(row.title, row.id);
@@ -157,4 +185,10 @@ export async function seedGames(games, db) {
 
   await syncTaxonomyLinks(db, "genres", linkEntries, prepared.flatMap((entry) => entry.genres));
   await syncTaxonomyLinks(db, "platforms", linkEntries, prepared.flatMap((entry) => entry.platforms));
+}
+
+export async function seedGames(games, db) {
+  for (let start = 0; start < games.length; start += MAX_GAMES_PER_BATCH) {
+    await seedGamesBatch(games.slice(start, start + MAX_GAMES_PER_BATCH), db);
+  }
 }

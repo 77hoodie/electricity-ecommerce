@@ -275,11 +275,13 @@ export async function syncAllGamesTaxonomy(db = prisma) {
   await syncTaxonomyLinks(db, normalized, "genres");
   await syncTaxonomyLinks(db, normalized, "platforms");
 
+  const updatedAt = new Date().toISOString();
+
   await db.$executeRaw`
     UPDATE "Game" AS target
     SET "genres" = incoming."genres",
         "platforms" = incoming."platforms",
-        "updatedAt" = (now() AT TIME ZONE 'UTC')
+        "updatedAt" = (${updatedAt}::timestamptz AT TIME ZONE 'UTC')
     FROM jsonb_to_recordset(${JSON.stringify(normalized)}::jsonb)
       AS incoming("id" integer, "genres" text[], "platforms" text[])
     WHERE target."id" = incoming."id"

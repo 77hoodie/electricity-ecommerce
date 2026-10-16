@@ -83,7 +83,7 @@ function applyRaw(db, strings, values) {
   if (statement.includes("UPDATE")) {
     if (db.failOnUpdate) throw db.failOnUpdate;
 
-    for (const entry of JSON.parse(values[0])) {
+    for (const entry of JSON.parse(values[1])) {
       const game = db.games.find((item) => item.id === entry.id);
       game.genres = entry.genres;
       game.platforms = entry.platforms;

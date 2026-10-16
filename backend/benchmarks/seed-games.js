@@ -6,12 +6,18 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { seedGames } from "../prisma/seedGames.js";
+import { seedGamesOriginal } from "./seed-games-original.js";
 
 const label = process.env.BENCH_LABEL || "before";
 const sizes = (process.env.BENCH_SIZES || "10,50,100,250,500,1000")
   .split(",")
   .map((item) => Number(item.trim()));
 const repetitions = Number(process.env.BENCH_REPETITIONS || 5);
+const implementation = label === "before" ? seedGamesOriginal : seedGames;
+
+if (!["before", "after"].includes(label)) {
+  throw new Error("BENCH_LABEL deve ser before ou after");
+}
 
 const genresPerGame = 3;
 const platformsPerGame = 2;
@@ -125,7 +131,7 @@ async function runOnce(n, games) {
 
   try {
     const start = performance.now();
-    await seedGames(games, db);
+    await implementation(games, db);
     elapsed = performance.now() - start;
   } finally {
     measuring = false;
@@ -140,7 +146,7 @@ async function runOnce(n, games) {
 }
 
 async function warmUp() {
-  await seedGames(createGames(3), db);
+  await implementation(createGames(3), db);
   await removeAll();
 }
 
