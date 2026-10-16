@@ -307,7 +307,6 @@ textarea {
   }
 }
 
-/* ── Carrinho: adições ── */
 
 .cart-nav-link {
   display: inline-flex;
@@ -547,7 +546,6 @@ select {
   }
 }
 
-/* Página inicial com aparência de loja real */
 .store-home {
   display: grid;
   gap: 1.4rem;

@@ -367,7 +367,6 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", message: "Electricity API rodando", database: "PostgreSQL + Prisma" });
 });
 
-// Auth
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const name = req.body.name?.trim();
@@ -443,7 +442,6 @@ app.put("/api/auth/me", requireAuth, async (req, res, next) => {
   }
 });
 
-// Users CRUD (admin)
 app.get("/api/users", requireAdmin, async (_req, res, next) => {
   try {
     const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
@@ -497,7 +495,6 @@ app.delete("/api/users/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Games CRUD
 app.get("/api/games", async (req, res, next) => {
   try {
     const search = req.query.search?.toString().trim();
@@ -634,7 +631,6 @@ app.delete("/api/games/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Genres CRUD
 app.get("/api/genres", async (_req, res, next) => {
   try {
     await ensureLegacyTaxonomySynced();
@@ -697,7 +693,6 @@ app.delete("/api/genres/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Platforms CRUD
 app.get("/api/platforms", async (_req, res, next) => {
   try {
     await ensureLegacyTaxonomySynced();
@@ -758,7 +753,6 @@ app.delete("/api/platforms/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Promotions CRUD
 app.get("/api/promotions", async (_req, res, next) => {
   try {
     const promotions = await prisma.promotion.findMany({
@@ -807,7 +801,6 @@ app.delete("/api/promotions/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// RAWG integration
 app.get("/api/rawg/search", requireAdmin, async (req, res, next) => {
   const { query } = req.query;
 
@@ -874,7 +867,6 @@ app.post("/api/rawg/import/:rawgId", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Cart and checkout
 app.get("/api/cart", async (req, res, next) => {
   try {
     const owner = await getCartOwner(req);

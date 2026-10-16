@@ -24,10 +24,6 @@ const platformsPerGame = 2;
 const genrePoolSize = 20;
 const platformPoolSize = 8;
 
-if (!["before", "after"].includes(label)) {
-  throw new Error("BENCH_LABEL deve ser before ou after");
-}
-
 if (sizes.length === 0 || sizes.some((n) => !Number.isSafeInteger(n) || n <= 0)) {
   throw new Error("BENCH_SIZES deve conter inteiros positivos separados por vírgula");
 }
