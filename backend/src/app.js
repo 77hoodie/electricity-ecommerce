@@ -188,12 +188,8 @@ export async function removeNameFromGameArray(field, name, db = prisma) {
   `;
 }
 
-let legacyTaxonomySynced = false;
-
-async function ensureLegacyTaxonomySynced() {
-  if (legacyTaxonomySynced) return;
-
-  const games = await prisma.game.findMany({
+export async function syncAllGamesTaxonomy(db = prisma) {
+  const games = await db.game.findMany({
     select: { id: true, genres: true, platforms: true }
   });
 
@@ -201,8 +197,16 @@ async function ensureLegacyTaxonomySynced() {
     await syncGameTaxonomy(game.id, {
       genres: game.genres || [],
       platforms: game.platforms || []
-    });
+    }, db);
   }
+}
+
+let legacyTaxonomySynced = false;
+
+async function ensureLegacyTaxonomySynced() {
+  if (legacyTaxonomySynced) return;
+
+  await syncAllGamesTaxonomy();
 
   legacyTaxonomySynced = true;
 }
