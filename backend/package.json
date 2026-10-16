@@ -21,7 +21,8 @@
     "benchmark:replace-name": "node benchmarks/replace-name-in-game-array.js",
     "benchmark:checkout": "node benchmarks/checkout-biblioteca.js",
     "benchmark:merge-guest": "node benchmarks/merge-guest.js",
-    "benchmark:legacy-taxonomy": "node benchmarks/sync-all-games-taxonomy.js"
+    "benchmark:legacy-taxonomy": "node benchmarks/sync-all-games-taxonomy.js",
+    "benchmark:seed-games": "node benchmarks/seed-games.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
