@@ -1,70 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "node:crypto";
+import { seedGames } from "./seedGames.js";
 
 const prisma = new PrismaClient();
 
 function hashPassword(password) {
   return createHash("sha256").update(password).digest("hex");
-}
-
-function parseStringList(value) {
-  const rawItems = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
-
-  const unique = new Map();
-  for (const item of rawItems) {
-    const name = String(item).trim();
-    if (name) unique.set(name.toLowerCase(), name);
-  }
-  return [...unique.values()];
-}
-
-async function syncGameGenres(gameId, names) {
-  const genres = parseStringList(names);
-  const records = [];
-  for (const name of genres) {
-    records.push(await prisma.genre.upsert({ where: { name }, update: {}, create: { name } }));
-  }
-
-  const ids = records.map((genre) => genre.id);
-  if (ids.length === 0) {
-    await prisma.gameGenre.deleteMany({ where: { gameId } });
-  } else {
-    await prisma.gameGenre.deleteMany({ where: { gameId, genreId: { notIn: ids } } });
-    await prisma.gameGenre.createMany({
-      data: ids.map((genreId) => ({ gameId, genreId })),
-      skipDuplicates: true
-    });
-  }
-  await prisma.game.update({ where: { id: gameId }, data: { genres } });
-}
-
-async function syncGamePlatforms(gameId, names) {
-  const platforms = parseStringList(names);
-  const records = [];
-  for (const name of platforms) {
-    records.push(await prisma.platform.upsert({ where: { name }, update: {}, create: { name } }));
-  }
-
-  const ids = records.map((platform) => platform.id);
-  if (ids.length === 0) {
-    await prisma.gamePlatform.deleteMany({ where: { gameId } });
-  } else {
-    await prisma.gamePlatform.deleteMany({ where: { gameId, platformId: { notIn: ids } } });
-    await prisma.gamePlatform.createMany({
-      data: ids.map((platformId) => ({ gameId, platformId })),
-      skipDuplicates: true
-    });
-  }
-  await prisma.game.update({ where: { id: gameId }, data: { platforms } });
-}
-
-async function syncGameTaxonomy(gameId, game) {
-  await syncGameGenres(gameId, game.genres || []);
-  await syncGamePlatforms(gameId, game.platforms || []);
 }
 
 async function main() {
@@ -147,26 +88,7 @@ async function main() {
     }
   ];
 
-  for (const game of games) {
-    const existing = await prisma.game.findFirst({ where: { title: game.title } });
-    const savedGame = existing
-      ? await prisma.game.update({
-          where: { id: existing.id },
-          data: {
-            description: game.description,
-            price: game.price,
-            coverUrl: game.coverUrl,
-            rating: game.rating,
-            genres: game.genres,
-            platforms: game.platforms,
-            releaseDate: game.releaseDate,
-            isActive: true
-          }
-        })
-      : await prisma.game.create({ data: game });
-
-    await syncGameTaxonomy(savedGame.id, game);
-  }
+  await seedGames(games, prisma);
 
   const hollowKnight = await prisma.game.findFirst({ where: { title: "Hollow Knight" } });
   if (hollowKnight) {

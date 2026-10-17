@@ -3,6 +3,7 @@ import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 import { HttpError } from "./errors.js";
 import { assertCanAddToCart, calculateCartTotal } from "./cartRules.js";
@@ -62,57 +63,69 @@ function parseStringList(value) {
   return [...unique.values()];
 }
 
-async function syncGameGenres(gameId, names, db = prisma) {
+export async function syncGameGenres(gameId, names, db = prisma) {
   const genres = parseStringList(names);
-  const records = [];
 
-  for (const name of genres) {
-    const genre = await db.genre.upsert({
-      where: { name },
-      update: {},
-      create: { name }
-    });
-    records.push(genre);
-  }
-
-  const ids = records.map((genre) => genre.id);
-  if (ids.length === 0) {
+  if (genres.length === 0) {
     await db.gameGenre.deleteMany({ where: { gameId } });
-  } else {
-    await db.gameGenre.deleteMany({ where: { gameId, genreId: { notIn: ids } } });
-    await db.gameGenre.createMany({
-      data: ids.map((genreId) => ({ gameId, genreId })),
-      skipDuplicates: true
-    });
+    await db.game.update({ where: { id: gameId }, data: { genres } });
+    return genres;
   }
+
+  await db.genre.createMany({
+    data: genres.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await db.genre.findMany({
+    where: { name: { in: genres } },
+    select: { id: true, name: true }
+  });
+
+  const idsByName = new Map(records.map(({ name, id }) => [name, id]));
+  const ids = genres.map((name) => idsByName.get(name));
+
+  await db.gameGenre.deleteMany({
+    where: { gameId, genreId: { notIn: ids } }
+  });
+  await db.gameGenre.createMany({
+    data: ids.map((genreId) => ({ gameId, genreId })),
+    skipDuplicates: true
+  });
 
   await db.game.update({ where: { id: gameId }, data: { genres } });
   return genres;
 }
 
-async function syncGamePlatforms(gameId, names, db = prisma) {
+export async function syncGamePlatforms(gameId, names, db = prisma) {
   const platforms = parseStringList(names);
-  const records = [];
 
-  for (const name of platforms) {
-    const platform = await db.platform.upsert({
-      where: { name },
-      update: {},
-      create: { name }
-    });
-    records.push(platform);
-  }
-
-  const ids = records.map((platform) => platform.id);
-  if (ids.length === 0) {
+  if (platforms.length === 0) {
     await db.gamePlatform.deleteMany({ where: { gameId } });
-  } else {
-    await db.gamePlatform.deleteMany({ where: { gameId, platformId: { notIn: ids } } });
-    await db.gamePlatform.createMany({
-      data: ids.map((platformId) => ({ gameId, platformId })),
-      skipDuplicates: true
-    });
+    await db.game.update({ where: { id: gameId }, data: { platforms } });
+    return platforms;
   }
+
+  await db.platform.createMany({
+    data: platforms.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await db.platform.findMany({
+    where: { name: { in: platforms } },
+    select: { id: true, name: true }
+  });
+
+  const idsByName = new Map(records.map(({ name, id }) => [name, id]));
+  const ids = platforms.map((name) => idsByName.get(name));
+
+  await db.gamePlatform.deleteMany({
+    where: { gameId, platformId: { notIn: ids } }
+  });
+  await db.gamePlatform.createMany({
+    data: ids.map((platformId) => ({ gameId, platformId })),
+    skipDuplicates: true
+  });
 
   await db.game.update({ where: { id: gameId }, data: { platforms } });
   return platforms;
@@ -130,39 +143,149 @@ async function findGameForResponse(id, db = prisma) {
   });
 }
 
-async function replaceNameInGameArray(field, oldName, newName, db = prisma) {
-  const games = await db.game.findMany({ where: { [field]: { has: oldName } } });
-  for (const game of games) {
-    const values = parseStringList((game[field] || []).map((value) => value === oldName ? newName : value));
-    await db.game.update({ where: { id: game.id }, data: { [field]: values } });
-  }
+export async function replaceNameInGameArray(field, oldName, newName, db = prisma) {
+  const column = GAME_ARRAY_COLUMNS.get(field);
+  if (!column) throw new Error(`Campo inválido: ${field}`);
+
+  const games = await db.game.findMany({
+    where: { [field]: { has: oldName } },
+    select: { id: true, [field]: true }
+  });
+
+  if (games.length === 0) return;
+
+  const updates = games.map((game) => ({
+    id: game.id,
+    values: parseStringList((game[field] || []).map((value) =>
+      value === oldName ? newName : value
+    ))
+  }));
+
+  await db.$executeRaw`
+    UPDATE "Game" AS target
+    SET ${column} = incoming."values",
+        "updatedAt" = (now() AT TIME ZONE 'UTC')
+    FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb)
+      AS incoming("id" integer, "values" text[])
+    WHERE target."id" = incoming."id"
+  `;
 }
 
-async function removeNameFromGameArray(field, name, db = prisma) {
-  const games = await db.game.findMany({ where: { [field]: { has: name } } });
-  for (const game of games) {
-    const values = (game[field] || []).filter((value) => value !== name);
-    await db.game.update({ where: { id: game.id }, data: { [field]: values } });
-  }
+const GAME_ARRAY_COLUMNS = new Map([
+  ["genres", Prisma.sql`"genres"`],
+  ["platforms", Prisma.sql`"platforms"`]
+]);
+
+export async function removeNameFromGameArray(field, name, db = prisma) {
+  const column = GAME_ARRAY_COLUMNS.get(field);
+  if (!column) throw new Error(`Campo inválido: ${field}`);
+
+  await db.$executeRaw`
+    UPDATE "Game"
+    SET ${column} = array_remove(${column}, ${name}::text),
+        "updatedAt" = (now() AT TIME ZONE 'UTC')
+    WHERE ${column} @> ARRAY[${name}::text]
+  `;
 }
 
 let legacyTaxonomySynced = false;
 
-async function ensureLegacyTaxonomySynced() {
+export async function ensureLegacyTaxonomySynced() {
   if (legacyTaxonomySynced) return;
+  await syncAllGamesTaxonomy(prisma);
+  legacyTaxonomySynced = true;
+}
 
-  const games = await prisma.game.findMany({
+const TAXONOMY_FIELDS = new Map([
+  ["genres", {
+    catalog: "genre",
+    link: "gameGenre",
+    foreignKey: "genreId",
+    table: Prisma.sql`"GameGenre"`,
+    column: Prisma.sql`"genreId"`
+  }],
+  ["platforms", {
+    catalog: "platform",
+    link: "gamePlatform",
+    foreignKey: "platformId",
+    table: Prisma.sql`"GamePlatform"`,
+    column: Prisma.sql`"platformId"`
+  }]
+]);
+
+async function resolveCatalogIds(model, names) {
+  const unique = [...new Set(names)];
+  if (unique.length === 0) return new Map();
+
+  await model.createMany({
+    data: unique.map((name) => ({ name })),
+    skipDuplicates: true
+  });
+
+  const records = await model.findMany({
+    where: { name: { in: unique } },
+    select: { id: true, name: true }
+  });
+
+  return new Map(records.map(({ name, id }) => [name, id]));
+}
+
+async function syncTaxonomyLinks(db, games, field) {
+  const { catalog, link, foreignKey, table, column } = TAXONOMY_FIELDS.get(field);
+  const idsByName = await resolveCatalogIds(
+    db[catalog],
+    games.flatMap((game) => game[field])
+  );
+
+  const desired = games.map((game) => ({
+    id: game.id,
+    ids: game[field].map((name) => idsByName.get(name))
+  }));
+
+  await db.$executeRaw`
+    DELETE FROM ${table} AS link
+    USING jsonb_to_recordset(${JSON.stringify(desired)}::jsonb)
+      AS scope("id" integer, "ids" integer[])
+    WHERE link."gameId" = scope."id"
+      AND NOT (link.${column} = ANY(scope."ids"))
+  `;
+
+  const data = desired.flatMap((entry) =>
+    entry.ids.map((id) => ({ gameId: entry.id, [foreignKey]: id }))
+  );
+
+  if (data.length > 0) {
+    await db[link].createMany({ data, skipDuplicates: true });
+  }
+}
+
+export async function syncAllGamesTaxonomy(db = prisma) {
+  const games = await db.game.findMany({
     select: { id: true, genres: true, platforms: true }
   });
 
-  for (const game of games) {
-    await syncGameTaxonomy(game.id, {
-      genres: game.genres || [],
-      platforms: game.platforms || []
-    });
-  }
+  if (games.length === 0) return;
 
-  legacyTaxonomySynced = true;
+  const normalized = games.map((game) => ({
+    id: game.id,
+    genres: parseStringList(game.genres || []),
+    platforms: parseStringList(game.platforms || [])
+  }));
+
+  await syncTaxonomyLinks(db, normalized, "genres");
+  await syncTaxonomyLinks(db, normalized, "platforms");
+
+  const updatedAt = new Date().toISOString();
+
+  await db.$executeRaw`
+    UPDATE "Game" AS target
+    SET "genres" = incoming."genres",
+        "platforms" = incoming."platforms",
+        "updatedAt" = (${updatedAt}::timestamptz AT TIME ZONE 'UTC')
+    FROM jsonb_to_recordset(${JSON.stringify(normalized)}::jsonb)
+      AS incoming("id" integer, "genres" text[], "platforms" text[])
+    WHERE target."id" = incoming."id"
+  `;
 }
 
 function getGuestCartId(req) {
@@ -244,7 +367,6 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", message: "Electricity API rodando", database: "PostgreSQL + Prisma" });
 });
 
-// Auth
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const name = req.body.name?.trim();
@@ -320,7 +442,6 @@ app.put("/api/auth/me", requireAuth, async (req, res, next) => {
   }
 });
 
-// Users CRUD (admin)
 app.get("/api/users", requireAdmin, async (_req, res, next) => {
   try {
     const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
@@ -374,7 +495,6 @@ app.delete("/api/users/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Games CRUD
 app.get("/api/games", async (req, res, next) => {
   try {
     const search = req.query.search?.toString().trim();
@@ -511,7 +631,6 @@ app.delete("/api/games/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Genres CRUD
 app.get("/api/genres", async (_req, res, next) => {
   try {
     await ensureLegacyTaxonomySynced();
@@ -574,7 +693,6 @@ app.delete("/api/genres/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Platforms CRUD
 app.get("/api/platforms", async (_req, res, next) => {
   try {
     await ensureLegacyTaxonomySynced();
@@ -635,7 +753,6 @@ app.delete("/api/platforms/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Promotions CRUD
 app.get("/api/promotions", async (_req, res, next) => {
   try {
     const promotions = await prisma.promotion.findMany({
@@ -684,7 +801,6 @@ app.delete("/api/promotions/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
-// RAWG integration
 app.get("/api/rawg/search", requireAdmin, async (req, res, next) => {
   const { query } = req.query;
 
@@ -751,7 +867,6 @@ app.post("/api/rawg/import/:rawgId", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Cart and checkout
 app.get("/api/cart", async (req, res, next) => {
   try {
     const owner = await getCartOwner(req);
@@ -809,40 +924,62 @@ app.delete("/api/cart", async (req, res, next) => {
   }
 });
 
-app.post("/api/cart/merge-guest", requireAuth, async (req, res, next) => {
-  try {
-    const sessionId = getGuestCartId(req);
-    const guestItems = await prisma.cartItem.findMany({
-      where: { sessionId },
-      include: { game: true }
-    });
+export async function mergeGuestCart(userId, sessionId, db = prisma) {
+  const guestItems = await db.cartItem.findMany({
+    where: { sessionId },
+    include: { game: true }
+  });
 
-    let merged = 0;
-    let skipped = 0;
+  if (guestItems.length === 0) {
+    await db.cartItem.deleteMany({ where: { sessionId } });
+    return { merged: 0, skipped: 0 };
+  }
 
-    for (const item of guestItems) {
-      const [existingCartItem, existingLibraryItem] = await Promise.all([
-        prisma.cartItem.findUnique({ where: { userId_gameId: { userId: req.user.id, gameId: item.gameId } } }),
-        prisma.libraryItem.findFirst({ where: { userId: req.user.id, gameId: item.gameId } })
-      ]);
+  const gameIds = guestItems.map((item) => item.gameId);
+  const [existingCartItems, existingLibraryItems] = await Promise.all([
+    db.cartItem.findMany({
+      where: { userId, gameId: { in: gameIds } },
+      select: { gameId: true }
+    }),
+    db.libraryItem.findMany({
+      where: { userId, gameId: { in: gameIds } },
+      select: { gameId: true }
+    })
+  ]);
 
-      if (existingCartItem || existingLibraryItem || !item.game?.isActive) {
-        skipped += 1;
-        continue;
-      }
+  const cartGameIds = new Set(existingCartItems.map((item) => item.gameId));
+  const libraryGameIds = new Set(existingLibraryItems.map((item) => item.gameId));
+  const eligibleItems = [];
 
-      await prisma.cartItem.create({
-        data: {
-          userId: req.user.id,
-          sessionId: null,
-          gameId: item.gameId,
-          priceAtMoment: item.priceAtMoment
-        }
-      });
-      merged += 1;
+  for (const item of guestItems) {
+    if (cartGameIds.has(item.gameId) || libraryGameIds.has(item.gameId) || !item.game?.isActive) {
+      continue;
     }
 
-    await prisma.cartItem.deleteMany({ where: { sessionId } });
+    eligibleItems.push({
+      userId,
+      sessionId: null,
+      gameId: item.gameId,
+      priceAtMoment: item.priceAtMoment
+    });
+  }
+
+  let merged = 0;
+  if (eligibleItems.length > 0) {
+    const result = await db.cartItem.createMany({
+      data: eligibleItems,
+      skipDuplicates: true
+    });
+    merged = result.count;
+  }
+
+  await db.cartItem.deleteMany({ where: { sessionId } });
+  return { merged, skipped: guestItems.length - merged };
+}
+
+app.post("/api/cart/merge-guest", requireAuth, async (req, res, next) => {
+  try {
+    const { merged, skipped } = await mergeGuestCart(req.user.id, getGuestCartId(req));
     const payload = await getCartPayload({ user: req.user, userId: req.user.id, sessionId: null });
     res.json({ merged, skipped, ...payload });
   } catch (error) {
@@ -874,11 +1011,15 @@ app.post("/api/orders/checkout", requireAuth, async (req, res, next) => {
         include: { user: true, items: { include: { game: { include: GAME_INCLUDE } } } }
       });
 
-      for (const item of cartItems) {
-        await tx.libraryItem.upsert({
-          where: { userId_gameId: { userId: req.user.id, gameId: item.gameId } },
-          update: {},
-          create: { userId: req.user.id, gameId: item.gameId }
+      const libraryData = cartItems.map((item) => ({
+        userId: req.user.id,
+        gameId: item.gameId
+      }));
+
+      if (libraryData.length > 0) {
+        await tx.libraryItem.createMany({
+          data: libraryData,
+          skipDuplicates: true
         });
       }
 
@@ -935,7 +1076,7 @@ app.patch("/api/orders/:id/status", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Wishlist
+
 app.get("/api/wishlist", requireAuth, async (req, res, next) => {
   try {
     const items = await prisma.wishlistItem.findMany({
